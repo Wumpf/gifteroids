@@ -17,21 +17,15 @@ fn main() {
         .run();
 }
 
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(Camera2dBundle::default());
 
     commands
         .spawn()
         .insert(SpaceShip)
         .insert(MovementSpeed(Vec2::ZERO))
-        .insert_bundle(MaterialMesh2dBundle {
-            mesh: meshes.add(Mesh::from(shape::Quad::default())).into(),
-            transform: Transform::default().with_scale(Vec3::splat(64.)),
-            material: materials.add(ColorMaterial::from(Color::PURPLE)),
+        .insert_bundle(SpriteBundle {
+            texture: asset_server.load("spaceship.png"),
             ..default()
         });
 }
