@@ -36,6 +36,10 @@ fn setup_world(mut commands: Commands, asset_server: Res<AssetServer>) {
         .insert(AABB::default())
         .insert_bundle(SpriteBundle {
             texture: asset_server.load("spaceship.png"),
+            transform: Transform {
+                scale: Vec3::new(0.5, 0.5, 1.0),
+                ..default()
+            },
             ..default()
         });
 }
