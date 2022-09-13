@@ -8,5 +8,6 @@ edition = "2021"
 [dependencies]
 # TODO: Trim down to necessary feature for small webapplication
 bevy = "0.8.1"
+rand = "0.8.0"
 
 # TODO: Optimize for size when doing web output

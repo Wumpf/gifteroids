@@ -1,4 +1,5 @@
 use bevy::{prelude::*, time::FixedTimestep};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 // Defines the amount of time that should elapse between each physics step.
 // A little bit opinionated ;)
@@ -8,8 +9,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .insert_resource(ClearColor(Color::BLACK))
-        .add_startup_system(setup_window)
-        .add_startup_system(setup_world)
+        .add_startup_system(setup)
         .add_system_set(
             SystemSet::new()
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
@@ -21,14 +21,17 @@ fn main() {
         .run();
 }
 
-fn setup_window(mut windows: ResMut<Windows>) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>, mut windows: ResMut<Windows>) {
     let window = windows.get_primary_mut().unwrap();
     window.set_resizable(false);
-}
+    let screen_size = Vec2 {
+        x: window.width(),
+        y: window.height(),
+    };
 
-fn setup_world(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(Camera2dBundle::default());
 
+    // The player
     commands
         .spawn()
         .insert(SpaceShip)
@@ -42,6 +45,45 @@ fn setup_world(mut commands: Commands, asset_server: Res<AssetServer>) {
             },
             ..default()
         });
+
+    // The gifteroids
+    const GIFTEROIDS_SPAWN_COUNT: u32 = 8;
+    const GIFTEROIDS_SPAWN_PLAYER_CLEARANCE: f32 = 80.0;
+    const GIFTEROIDS_BASE_SPEED: f32 = 50.0;
+
+    let mut rng = StdRng::seed_from_u64(123);
+    let half_screen_size = screen_size * 0.5;
+    let gifteroid_texture = asset_server.load("gift.png");
+    for _ in 0..GIFTEROIDS_SPAWN_COUNT {
+        // random position. Leave space around the player.
+        let translation = Vec3 {
+            x: rng.gen_range(GIFTEROIDS_SPAWN_PLAYER_CLEARANCE..half_screen_size.x)
+                * if rng.gen::<bool>() { -1.0 } else { 1.0 },
+            y: rng.gen_range(GIFTEROIDS_SPAWN_PLAYER_CLEARANCE..half_screen_size.y)
+                * if rng.gen::<bool>() { -1.0 } else { 1.0 },
+            z: 0.0,
+        };
+
+        let sprite_orientation = rng.gen_range(0.0..std::f32::consts::TAU);
+        let movement_orientation = rng.gen_range(0.0..std::f32::consts::TAU);
+        let movement = Vec2::new(movement_orientation.sin(), movement_orientation.cos())
+            * GIFTEROIDS_BASE_SPEED;
+
+        commands.spawn_bundle(GifteroidBundle {
+            size: GifteroidSize::Large,
+            sprite: SpriteBundle {
+                texture: gifteroid_texture.clone(),
+                transform: Transform {
+                    translation,
+                    rotation: Quat::from_rotation_z(sprite_orientation),
+                    ..default()
+                },
+                ..default()
+            },
+            movement: MovementSpeed(movement),
+            aabb: AABB::default(),
+        });
+    }
 }
 
 #[derive(Component)]
@@ -52,6 +94,22 @@ struct MovementSpeed(Vec2);
 struct AABB {
     min: Vec2,
     max: Vec2,
+}
+
+#[derive(Bundle)]
+struct GifteroidBundle {
+    size: GifteroidSize,
+    #[bundle]
+    sprite: SpriteBundle,
+    movement: MovementSpeed,
+    aabb: AABB,
+}
+
+#[derive(Component)]
+enum GifteroidSize {
+    Large,
+    Medium,
+    Small,
 }
 
 impl AABB {
@@ -104,8 +162,9 @@ fn control_spaceship(
     keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<(&mut MovementSpeed, &mut Transform), With<SpaceShip>>,
 ) {
-    const ACCELERATION: f32 = 100.0;
+    const ACCELERATION: f32 = 400.0;
     const ROTATION_SPEED: f32 = 2.0;
+    const FRICTION: f32 = 0.5;
 
     let (mut speed, mut transform) = query.single_mut();
 
@@ -118,4 +177,6 @@ fn control_spaceship(
     if keyboard_input.pressed(KeyCode::Up) {
         speed.0 += transform.rotation.mul_vec3(Vec3::Y).truncate() * (ACCELERATION * TIME_STEP);
     }
+
+    speed.0 *= FRICTION.powf(TIME_STEP);
 }
