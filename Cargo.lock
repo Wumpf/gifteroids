@@ -530,6 +530,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_prototype_debug_lines"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e272fe1736bff610fc80982d31b437eb75dc7d7e087fdd470ddcbeb9bdfa8a0"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
 name = "bevy_ptr"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1449,6 +1458,7 @@ name = "gifteroids"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_prototype_debug_lines",
  "rand",
 ]
 
