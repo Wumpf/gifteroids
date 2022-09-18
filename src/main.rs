@@ -23,7 +23,8 @@ fn main() {
 
     #[cfg(feature = "debug_lines")]
     app.add_plugin(DebugLinesPlugin::default())
-        .add_system(draw_obb_debug_lines);
+        .add_system(draw_obb_debug_lines)
+        .add_system(draw_spaceship_debug_lines);
 
     app.run();
 }
@@ -45,7 +46,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>, mut windows: Re
         .spawn()
         .insert(SpaceShip)
         .insert(MovementSpeed(Vec2::ZERO))
-        .insert(AABB::default())
         .insert_bundle(SpriteBundle {
             texture: asset_server.load("spaceship.png"),
             transform: Transform {
@@ -135,7 +135,6 @@ struct OrientedBox {
     axis1: Vec2,
 }
 
-#[derive(Component, Default)]
 struct AABB {
     min: Vec2,
     max: Vec2,
@@ -186,6 +185,24 @@ fn draw_obb_debug_lines(
     }
 }
 
+#[cfg(feature = "debug_lines")]
+fn draw_spaceship_debug_lines(
+    mut lines: ResMut<DebugLines>,
+    query: Query<&Transform, With<SpaceShip>>,
+) {
+    for transform in &query {
+        let (tri_a, tri_b, tri_c) = span_spaceship_triangle(
+            transform.translation.truncate(),
+            transform.rotation,
+            transform.scale.x,
+        );
+
+        lines.line_colored(tri_a.extend(0.0), tri_b.extend(0.0), 0.0, Color::ORANGE_RED);
+        lines.line_colored(tri_b.extend(0.0), tri_c.extend(0.0), 0.0, Color::ORANGE_RED);
+        lines.line_colored(tri_c.extend(0.0), tri_a.extend(0.0), 0.0, Color::ORANGE_RED);
+    }
+}
+
 fn screen_wrap_obb_entities(
     camera_query: Query<&OrthographicProjection, With<Camera2d>>,
     mut query: Query<(&mut Transform, &OrientedBox)>,
@@ -214,7 +231,22 @@ fn screen_wrap_obb_entities(
     }
 }
 
+fn span_spaceship_triangle(position: Vec2, rotation: Quat, scale: f32) -> (Vec2, Vec2, Vec2) {
+    // could ofc read this from data, but needlessly nasty to pass around
+    const SPACESHIP_SPRITE_SIZE: f32 = 128.0;
+
+    let forward = (rotation * Vec3::Y).truncate();
+    let side = (rotation * Vec3::X).truncate();
+
+    let a = position + forward * (SPACESHIP_SPRITE_SIZE * 0.5 * scale);
+    let b = position - (forward - side) * (SPACESHIP_SPRITE_SIZE * 0.5 * scale);
+    let c = position - (forward + side) * (SPACESHIP_SPRITE_SIZE * 0.5 * scale);
+
+    (a, b, c)
+}
+
 fn control_spaceship(
+    camera_query: Query<&OrthographicProjection, With<Camera2d>>,
     keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<(&mut MovementSpeed, &mut Transform), With<SpaceShip>>,
 ) {
@@ -226,13 +258,41 @@ fn control_spaceship(
 
     if keyboard_input.pressed(KeyCode::Left) {
         transform.rotate_z(ROTATION_SPEED * TIME_STEP);
+        transform.rotation = transform.rotation.normalize();
     }
     if keyboard_input.pressed(KeyCode::Right) {
         transform.rotate_z(-ROTATION_SPEED * TIME_STEP);
+        transform.rotation = transform.rotation.normalize();
     }
     if keyboard_input.pressed(KeyCode::Up) {
         speed.0 += transform.rotation.mul_vec3(Vec3::Y).truncate() * (ACCELERATION * TIME_STEP);
     }
-
     speed.0 *= FRICTION.powf(TIME_STEP);
+
+    let camera = camera_query.single();
+    screen_wrap_space_ship(&mut transform, camera);
+}
+
+fn screen_wrap_space_ship(transform: &mut Transform, camera: &OrthographicProjection) {
+    let (tri_a, tri_b, tri_c) = span_spaceship_triangle(
+        transform.translation.truncate(),
+        transform.rotation,
+        transform.scale.x,
+    );
+
+    let max_x = tri_a.x.max(tri_b.x).max(tri_c.x);
+    let min_x = tri_a.x.min(tri_b.x).min(tri_c.x);
+    let max_y = tri_a.y.max(tri_b.y).max(tri_c.y);
+    let min_y = tri_a.y.min(tri_b.y).min(tri_c.y);
+
+    if max_y < camera.bottom {
+        transform.translation.y = camera.top + (transform.translation.y - min_y) - 0.1;
+    } else if min_y > camera.top {
+        transform.translation.y = camera.bottom - (max_y - transform.translation.y) + 0.1;
+    }
+    if max_x < camera.left {
+        transform.translation.x = camera.right + (transform.translation.x - min_x) - 0.1;
+    } else if min_x > camera.right {
+        transform.translation.x = camera.left - (max_x - transform.translation.x) + 0.1;
+    }
 }
