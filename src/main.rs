@@ -1,5 +1,5 @@
 use bevy::{prelude::*, time::FixedTimestep};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{random, rngs::StdRng, Rng, SeedableRng};
 
 #[cfg(feature = "debug_lines")]
 use bevy_prototype_debug_lines::*;
@@ -18,8 +18,10 @@ fn main() {
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                 .with_system(control_spaceship)
                 .with_system(move_objects)
-                .with_system(screen_wrap_obb_entities),
-        );
+                .with_system(screen_wrap_obb_entities)
+                .with_system(screen_wrap_snowball),
+        )
+        .add_system(shoot_snowballs);
 
     #[cfg(feature = "debug_lines")]
     app.add_plugin(DebugLinesPlugin::default())
@@ -45,6 +47,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>, mut windows: Re
     commands
         .spawn()
         .insert(SpaceShip)
+        .insert(SnowballShootingCooldown(0.0))
         .insert(MovementSpeed(Vec2::ZERO))
         .insert_bundle(SpriteBundle {
             texture: asset_server.load("spaceship.png"),
@@ -54,6 +57,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>, mut windows: Re
             },
             ..default()
         });
+
+    commands.insert_resource(SnowballSprite(asset_server.load("snowball.png")));
 
     spawn_gifteroids(screen_size, asset_server, commands);
 }
@@ -111,6 +116,9 @@ fn spawn_gifteroids(screen_size: Vec2, asset_server: Res<AssetServer>, mut comma
 #[derive(Component)]
 struct SpaceShip;
 #[derive(Component)]
+struct SnowballShootingCooldown(f32);
+
+#[derive(Component)]
 struct MovementSpeed(Vec2);
 #[derive(Bundle)]
 struct GifteroidBundle {
@@ -139,6 +147,11 @@ struct AABB {
     min: Vec2,
     max: Vec2,
 }
+
+#[derive(Component)]
+struct Snowball;
+
+struct SnowballSprite(Handle<Image>);
 
 impl AABB {
     fn size(&self) -> Vec2 {
@@ -191,11 +204,7 @@ fn draw_spaceship_debug_lines(
     query: Query<&Transform, With<SpaceShip>>,
 ) {
     for transform in &query {
-        let (tri_a, tri_b, tri_c) = span_spaceship_triangle(
-            transform.translation.truncate(),
-            transform.rotation,
-            transform.scale.x,
-        );
+        let (tri_a, tri_b, tri_c) = span_spaceship_triangle(transform);
 
         lines.line_colored(tri_a.extend(0.0), tri_b.extend(0.0), 0.0, Color::ORANGE_RED);
         lines.line_colored(tri_b.extend(0.0), tri_c.extend(0.0), 0.0, Color::ORANGE_RED);
@@ -231,12 +240,37 @@ fn screen_wrap_obb_entities(
     }
 }
 
-fn span_spaceship_triangle(position: Vec2, rotation: Quat, scale: f32) -> (Vec2, Vec2, Vec2) {
+fn screen_wrap_snowball(
+    camera_query: Query<&OrthographicProjection, With<Camera2d>>,
+    mut query: Query<&mut Transform, With<Snowball>>,
+) {
+    const SNOWBALL_SIZE: f32 = 8.0;
+
+    let camera = camera_query.single();
+
+    for mut transform in &mut query {
+        if transform.translation.y + SNOWBALL_SIZE < camera.bottom {
+            transform.translation.y = camera.top + SNOWBALL_SIZE - 0.1;
+        } else if transform.translation.y - SNOWBALL_SIZE > camera.top {
+            transform.translation.y = camera.bottom - SNOWBALL_SIZE + 0.1;
+        }
+        if transform.translation.x + SNOWBALL_SIZE < camera.left {
+            transform.translation.x = camera.right + SNOWBALL_SIZE - 0.1;
+        } else if transform.translation.x - SNOWBALL_SIZE > camera.right {
+            transform.translation.x = camera.left - SNOWBALL_SIZE + 0.1;
+        }
+    }
+}
+
+fn span_spaceship_triangle(transform: &Transform) -> (Vec2, Vec2, Vec2) {
     // could ofc read this from data, but needlessly nasty to pass around
     const SPACESHIP_SPRITE_SIZE: f32 = 128.0;
 
-    let forward = (rotation * Vec3::Y).truncate();
-    let side = (rotation * Vec3::X).truncate();
+    let position = transform.translation.truncate();
+    let scale = transform.scale.x;
+
+    let forward = (transform.rotation * Vec3::Y).truncate();
+    let side = (transform.rotation * Vec3::X).truncate();
 
     let a = position + forward * (SPACESHIP_SPRITE_SIZE * 0.5 * scale);
     let b = position - (forward - side) * (SPACESHIP_SPRITE_SIZE * 0.5 * scale);
@@ -274,11 +308,7 @@ fn control_spaceship(
 }
 
 fn screen_wrap_space_ship(transform: &mut Transform, camera: &OrthographicProjection) {
-    let (tri_a, tri_b, tri_c) = span_spaceship_triangle(
-        transform.translation.truncate(),
-        transform.rotation,
-        transform.scale.x,
-    );
+    let (tri_a, tri_b, tri_c) = span_spaceship_triangle(transform);
 
     let max_x = tri_a.x.max(tri_b.x).max(tri_c.x);
     let min_x = tri_a.x.min(tri_b.x).min(tri_c.x);
@@ -295,4 +325,42 @@ fn screen_wrap_space_ship(transform: &mut Transform, camera: &OrthographicProjec
     } else if min_x > camera.right {
         transform.translation.x = camera.left - (max_x - transform.translation.x) + 0.1;
     }
+}
+
+fn shoot_snowballs(
+    mut commands: Commands,
+    time: Res<Time>,
+    snowball_sprite: Res<SnowballSprite>,
+    keyboard_input: Res<Input<KeyCode>>,
+    mut query: Query<(&mut SnowballShootingCooldown, &Transform)>,
+) {
+    const SNOWBALL_COOLDOWN_SECONDS: f32 = 0.25;
+    const SNOWBALL_SPEED: f32 = 500.0;
+
+    let (mut cooldown, transform) = query.single_mut();
+    cooldown.0 -= time.delta_seconds();
+    cooldown.0 = cooldown.0.min(0.0);
+
+    if cooldown.0 > 0.0 || !keyboard_input.just_pressed(KeyCode::Space) {
+        return;
+    }
+
+    let (tri_a, _, _) = span_spaceship_triangle(transform);
+
+    cooldown.0 += SNOWBALL_COOLDOWN_SECONDS;
+    commands
+        .spawn()
+        .insert(Snowball)
+        .insert(MovementSpeed(
+            transform.rotation.mul_vec3(Vec3::Y).truncate() * SNOWBALL_SPEED,
+        ))
+        .insert_bundle(SpriteBundle {
+            texture: snowball_sprite.0.clone(),
+            transform: Transform {
+                translation: tri_a.extend(0.0),
+                scale: Vec3::new(0.5, 0.5, 1.0),
+                ..default()
+            },
+            ..default()
+        });
 }
