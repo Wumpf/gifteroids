@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::prelude::*;
 
 use crate::MovementSpeed;
@@ -8,8 +10,9 @@ impl Plugin for SpaceshipPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup)
             .add_system(control_spaceship)
-            .add_system(shoot_snowballs)
-            .add_system(screen_wrap_snowball);
+            .add_system(snowballs_shoot)
+            .add_system(snowballs_screen_wrap)
+            .add_system(snowballs_timeout);
     }
 }
 
@@ -57,7 +60,9 @@ impl SpaceShip {
 struct SnowballShootingCooldown(f32);
 
 #[derive(Component)]
-struct Snowball;
+struct Snowball {
+    spawn_time: Duration,
+}
 
 struct SnowballSprite(Handle<Image>);
 
@@ -111,7 +116,7 @@ fn screen_wrap_space_ship(transform: &mut Transform, camera: &OrthographicProjec
     }
 }
 
-fn shoot_snowballs(
+fn snowballs_shoot(
     mut commands: Commands,
     time: Res<Time>,
     snowball_sprite: Res<SnowballSprite>,
@@ -134,7 +139,9 @@ fn shoot_snowballs(
     cooldown.0 += SNOWBALL_COOLDOWN_SECONDS;
     commands
         .spawn()
-        .insert(Snowball)
+        .insert(Snowball {
+            spawn_time: time.time_since_startup(),
+        })
         .insert(MovementSpeed(
             transform.rotation.mul_vec3(Vec3::Y).truncate() * SNOWBALL_SPEED,
         ))
@@ -149,7 +156,7 @@ fn shoot_snowballs(
         });
 }
 
-fn screen_wrap_snowball(
+fn snowballs_screen_wrap(
     camera_query: Query<&OrthographicProjection, With<Camera2d>>,
     mut query: Query<&mut Transform, With<Snowball>>,
 ) {
@@ -167,6 +174,24 @@ fn screen_wrap_snowball(
             transform.translation.x = camera.right + SNOWBALL_SIZE - 0.1;
         } else if transform.translation.x - SNOWBALL_SIZE > camera.right {
             transform.translation.x = camera.left - SNOWBALL_SIZE + 0.1;
+        }
+    }
+}
+
+fn snowballs_timeout(
+    mut commands: Commands,
+    time: Res<Time>,
+    snowballs: Query<(Entity, &Snowball)>,
+) {
+    const SNOWBALL_MAX_LIFE_TIME: Duration = Duration::new(1, 500_000_000);
+
+    let min_snowball_time = time
+        .time_since_startup()
+        .saturating_sub(SNOWBALL_MAX_LIFE_TIME);
+
+    for (entity, snowball) in &snowballs {
+        if snowball.spawn_time < min_snowball_time {
+            commands.entity(entity).despawn();
         }
     }
 }
