@@ -3,7 +3,8 @@
 use bevy::prelude::*;
 use bevy_prototype_debug_lines::*;
 
-use crate::{OrientedBox, SpaceShip};
+use crate::gifteroids::OrientedBox;
+use crate::spaceship::SpaceShip;
 
 pub struct DebugLinesPlugin;
 
