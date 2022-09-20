@@ -60,7 +60,7 @@ impl SpaceShip {
 struct SnowballShootingCooldown(f32);
 
 #[derive(Component)]
-struct Snowball {
+pub struct Snowball {
     spawn_time: Duration,
 }
 
