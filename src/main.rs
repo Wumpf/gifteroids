@@ -1,12 +1,9 @@
 use bevy::prelude::*;
 
+mod collision;
 mod debug_lines;
 mod gifteroids;
 mod spaceship;
-
-// Defines the amount of time that should elapse between each physics step.
-// A little bit opinionated ;)
-const TIME_STEP: f32 = 1.0 / 120.0;
 
 fn main() {
     let mut app = App::new();
@@ -35,8 +32,8 @@ fn setup(mut commands: Commands, mut windows: ResMut<Windows>) {
 #[derive(Component)]
 pub struct MovementSpeed(pub Vec2);
 
-fn move_objects(mut query: Query<(&mut Transform, &MovementSpeed)>) {
-    for (mut transform, speed) in &mut query {
-        transform.translation += Vec3::from((speed.0 * TIME_STEP, 0.0));
+fn move_objects(time: Res<Time>, mut query: Query<(&mut Transform, &MovementSpeed)>) {
+    for (mut transform, speed) in query.iter_mut() {
+        transform.translation += Vec3::from((speed.0 * time.delta_seconds(), 0.0));
     }
 }
