@@ -8,6 +8,10 @@ pub struct SpaceshipPlugin;
 
 pub struct SpaceShipDestroyedEvent(pub Entity);
 
+// could ofc read this from data, but needlessly nasty to pass around
+pub const SPACESHIP_SPRITE_SIZE: f32 = 128.0;
+pub const SPACESHIP_SPRITE_FILE: &'static str = "spaceship.png";
+
 impl Plugin for SpaceshipPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup)
@@ -30,7 +34,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         .insert(SnowballShootingCooldown(0.0))
         .insert(MovementSpeed(Vec2::ZERO))
         .insert_bundle(SpriteBundle {
-            texture: asset_server.load("spaceship.png"),
+            texture: asset_server.load(SPACESHIP_SPRITE_FILE),
             transform: Transform {
                 scale: Vec3::new(0.5, 0.5, 1.0),
                 ..default()
@@ -49,9 +53,6 @@ pub struct SpaceShip {
 
 impl SpaceShip {
     pub fn bounding_triangle(transform: &Transform) -> (Vec2, Vec2, Vec2) {
-        // could ofc read this from data, but needlessly nasty to pass around
-        const SPACESHIP_SPRITE_SIZE: f32 = 128.0;
-
         let position = transform.translation.truncate();
         let scale = transform.scale.x;
 
@@ -218,7 +219,7 @@ fn space_ship_destroy(
     mut commands: Commands,
     mut destroyed_events: EventReader<SpaceShipDestroyedEvent>,
 ) {
-    for entity in destroyed_events.iter() {
+    for _ in destroyed_events.iter() {
         println!("despawn!");
         // TODO
     }

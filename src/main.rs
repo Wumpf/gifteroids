@@ -4,6 +4,7 @@ mod collision;
 mod debug_lines;
 mod gifteroids;
 mod spaceship;
+mod ui;
 
 fn main() {
     let mut app = App::new();
@@ -12,6 +13,7 @@ fn main() {
         .add_startup_system(setup)
         .add_plugin(gifteroids::GifteroidsPlugin)
         .add_plugin(spaceship::SpaceshipPlugin)
+        .add_plugin(ui::UiPlugin)
         .add_system(move_objects);
 
     #[cfg(feature = "debug_lines")]
