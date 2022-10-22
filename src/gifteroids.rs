@@ -1,7 +1,11 @@
 use bevy::prelude::*;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-use crate::{spaceship::Snowball, MovementSpeed};
+use crate::{
+    collision::{line_line_test, point_in_box},
+    spaceship::{Snowball, SpaceShip, SpaceShipDestroyedEvent},
+    MovementSpeed,
+};
 
 pub struct GifteroidsPlugin;
 
@@ -10,6 +14,7 @@ impl Plugin for GifteroidsPlugin {
         app.add_startup_system(setup.exclusive_system())
             .add_startup_system(spawn_gifteroids)
             .add_system(gifteroid_snowball_collision)
+            .add_system(gifteroid_spaceship_collision)
             .add_system(screen_wrap_obb_entities);
     }
 }
@@ -159,17 +164,13 @@ fn gifteroid_snowball_collision(
 ) {
     for (entity_gifteroid, transform_gifteroid, obb, size) in &query_gifteroids {
         let position_gifteroid = transform_gifteroid.translation.truncate();
-        let box_lensq0 = obb.axis0.length_squared();
-        let box_lensq1 = obb.axis1.length_squared();
-
         for (entity_snowball, transform_snowball) in &query_snowballs {
             // snowballs have a radius, but we ignore it here since they move fast enough
-            let position = transform_snowball.translation.truncate();
-            let to_snowball = position - position_gifteroid;
-            let dot0 = obb.axis0.dot(to_snowball);
-            let dot1 = obb.axis1.dot(to_snowball);
-
-            if dot0 > -box_lensq0 && dot0 < box_lensq0 && dot1 > -box_lensq1 && dot1 < box_lensq1 {
+            if point_in_box(
+                &obb,
+                transform_snowball.translation.truncate(),
+                position_gifteroid,
+            ) {
                 commands.entity(entity_gifteroid).despawn();
                 commands.entity(entity_snowball).despawn();
 
@@ -189,6 +190,49 @@ fn gifteroid_snowball_collision(
                     )
                 }
             }
+        }
+    }
+}
+
+fn gifteroid_spaceship_collision(
+    mut commands: Commands,
+    query_gifteroids: Query<(&Transform, &OrientedBox), With<GifteroidSize>>,
+    query_spaceship: Query<(Entity, &Transform), With<SpaceShip>>,
+    mut destroyed_events: EventWriter<SpaceShipDestroyedEvent>,
+) {
+    // Detect collision by checking line collisions. Not perfect, but good enough and easy to implement
+    // outer lines of spaceship
+    if let Err(_) = query_spaceship.get_single() {
+        return;
+    }
+    let (spaceship_entity, spaceship_transform) = query_spaceship.single();
+    let (tri_a, tri_b, tri_c) = SpaceShip::bounding_triangle(spaceship_transform);
+
+    for (transform_gifteroid, obb) in &query_gifteroids {
+        let position_gifteroid = transform_gifteroid.translation.truncate();
+
+        // outer lines of gifteroid
+        let top_right = position_gifteroid + obb.axis0 + obb.axis1;
+        let top_left = position_gifteroid - obb.axis0 + obb.axis1;
+        let bottom_left = position_gifteroid - obb.axis0 - obb.axis1;
+        let bottom_right = position_gifteroid + obb.axis0 - obb.axis1;
+
+        if line_line_test(tri_a, tri_b, top_right, top_left)
+            || line_line_test(tri_a, tri_b, top_left, bottom_left)
+            || line_line_test(tri_a, tri_b, bottom_left, bottom_right)
+            || line_line_test(tri_a, tri_b, bottom_right, top_right)
+            || line_line_test(tri_b, tri_c, top_right, top_left)
+            || line_line_test(tri_b, tri_c, top_left, bottom_left)
+            || line_line_test(tri_b, tri_c, bottom_left, bottom_right)
+            || line_line_test(tri_b, tri_c, bottom_right, top_right)
+            || line_line_test(tri_c, tri_a, top_right, top_left)
+            || line_line_test(tri_c, tri_a, top_left, bottom_left)
+            || line_line_test(tri_c, tri_a, bottom_left, bottom_right)
+            || line_line_test(tri_c, tri_a, bottom_right, top_right)
+        {
+            destroyed_events.send(SpaceShipDestroyedEvent(spaceship_entity));
+            commands.entity(spaceship_entity).despawn();
+            break;
         }
     }
 }

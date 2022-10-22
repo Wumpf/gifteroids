@@ -6,20 +6,27 @@ use crate::MovementSpeed;
 
 pub struct SpaceshipPlugin;
 
+pub struct SpaceShipDestroyedEvent(pub Entity);
+
 impl Plugin for SpaceshipPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup)
             .add_system(control_spaceship)
             .add_system(snowballs_shoot)
             .add_system(snowballs_screen_wrap)
-            .add_system(snowballs_timeout);
+            .add_system(snowballs_timeout)
+            .add_event::<SpaceShipDestroyedEvent>()
+            .add_system(space_ship_destroy);
     }
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn()
-        .insert(SpaceShip)
+        .insert(SpaceShip {
+            lives_left: 3,
+            alive: true,
+        })
         .insert(SnowballShootingCooldown(0.0))
         .insert(MovementSpeed(Vec2::ZERO))
         .insert_bundle(SpriteBundle {
@@ -35,7 +42,10 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 #[derive(Component)]
-pub struct SpaceShip;
+pub struct SpaceShip {
+    pub lives_left: u32,
+    pub alive: bool,
+}
 
 impl SpaceShip {
     pub fn bounding_triangle(transform: &Transform) -> (Vec2, Vec2, Vec2) {
@@ -75,6 +85,10 @@ fn control_spaceship(
     const ACCELERATION: f32 = 400.0;
     const ROTATION_SPEED: f32 = 2.0;
     const FRICTION: f32 = 0.5;
+
+    if let Err(_) = query.get_single() {
+        return;
+    }
 
     let (mut speed, mut transform) = query.single_mut();
 
@@ -125,6 +139,10 @@ fn snowballs_shoot(
 ) {
     const SNOWBALL_COOLDOWN_SECONDS: f32 = 0.25;
     const SNOWBALL_SPEED: f32 = 500.0;
+
+    if let Err(_) = query.get_single() {
+        return;
+    }
 
     let (mut cooldown, transform) = query.single_mut();
     cooldown.0 -= time.delta_seconds();
@@ -193,5 +211,15 @@ fn snowballs_timeout(
         if snowball.spawn_time < min_snowball_time {
             commands.entity(entity).despawn();
         }
+    }
+}
+
+fn space_ship_destroy(
+    mut commands: Commands,
+    mut destroyed_events: EventReader<SpaceShipDestroyedEvent>,
+) {
+    for entity in destroyed_events.iter() {
+        println!("despawn!");
+        // TODO
     }
 }
