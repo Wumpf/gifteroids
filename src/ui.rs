@@ -1,9 +1,6 @@
-use bevy::{prelude::*, sprite::Anchor};
+use bevy::prelude::*;
 
-use crate::spaceship::{
-    SpaceShipDestroyedEvent, SpaceShipSprite, NUM_LIVES_ON_STARTUP, SPACESHIP_SPRITE_FILE,
-    SPACESHIP_SPRITE_SIZE,
-};
+use crate::spaceship::{SpaceShipDestroyedEvent, NUM_LIVES_ON_STARTUP, SPACESHIP_SPRITE_FILE};
 
 pub struct UiPlugin;
 
@@ -19,66 +16,40 @@ struct SpaceShipLiveDisplay {
     life_icons: Vec<Entity>,
 }
 
-fn setup_life_display(
-    windows: Res<Windows>,
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
-    let window = windows.get_primary().unwrap();
-    let screen_size = Vec2 {
-        x: window.width(),
-        y: window.height(),
-    };
-    let top_left_corner = Vec2::new(-screen_size.x * 0.5, screen_size.y * 0.5);
+fn setup_life_display(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let space_ship_image = UiImage::from(asset_server.load(SPACESHIP_SPRITE_FILE));
 
-    let space_ship_texture = asset_server.load(SPACESHIP_SPRITE_FILE);
-    let scale = 0.35;
-
-    let life_icons = (0..NUM_LIVES_ON_STARTUP)
-        .map(|i| {
-            commands
-                .spawn()
-                .insert_bundle(SpriteBundle {
-                    texture: space_ship_texture.clone(),
-                    transform: Transform {
-                        translation: top_left_corner.extend(1.0)
-                            + Vec3::new(
-                                SPACESHIP_SPRITE_SIZE * scale * i as f32 + 10.0 * (i + 1) as f32,
-                                -10.0,
-                                0.0,
-                            ),
-                        scale: Vec3::new(scale, scale, 1.0),
-                        ..default()
-                    },
-                    sprite: Sprite {
-                        anchor: Anchor::TopLeft,
-                        ..default()
-                    },
-                    ..default()
-                })
-                .id()
+    let mut life_icons = Vec::new();
+    commands
+        .spawn_bundle(NodeBundle {
+            style: Style {
+                justify_content: JustifyContent::FlexStart,
+                align_items: AlignItems::FlexEnd,
+                align_self: AlignSelf::FlexEnd,
+                ..default()
+            },
+            color: Color::NONE.into(),
+            ..default()
         })
-        .collect();
-    commands.spawn().insert(SpaceShipLiveDisplay { life_icons });
+        .with_children(|parent| {
+            life_icons = (0..NUM_LIVES_ON_STARTUP)
+                .map(|_| {
+                    parent
+                        .spawn_bundle(ImageBundle {
+                            style: Style {
+                                size: Size::new(Val::Px(70.0), Val::Auto),
+                                margin: UiRect::all(Val::Px(10.0)),
+                                ..default()
+                            },
+                            image: space_ship_image.clone(),
+                            ..default()
+                        })
+                        .id()
+                })
+                .collect();
+        });
 
-    commands.spawn().insert_bundle(SpriteBundle {
-        transform: Transform {
-            translation: top_left_corner.extend(0.5),
-            scale: Vec3::new(
-                SPACESHIP_SPRITE_SIZE * (NUM_LIVES_ON_STARTUP as f32) * scale
-                    + (1 + NUM_LIVES_ON_STARTUP) as f32 * 10.0,
-                SPACESHIP_SPRITE_SIZE * scale + 20.0,
-                1.5,
-            ),
-            ..default()
-        },
-        sprite: Sprite {
-            anchor: Anchor::TopLeft,
-            color: Color::BLACK,
-            ..default()
-        },
-        ..default()
-    });
+    commands.spawn().insert(SpaceShipLiveDisplay { life_icons });
 }
 
 fn on_space_ship_destroy(
@@ -89,7 +60,7 @@ fn on_space_ship_destroy(
     for _ in destroyed_events.iter() {
         let display = &mut query.single_mut();
         if let Some(entity) = display.life_icons.pop() {
-            commands.entity(entity).despawn();
+            commands.entity(entity).despawn_recursive(); // TODO: despawn is the wrong strategy. want to be able to reset them
         }
     }
 }
