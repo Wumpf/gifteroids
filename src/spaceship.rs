@@ -10,6 +10,7 @@ pub struct SpaceShipDestroyedEvent(pub Entity);
 
 // could ofc read this from data, but needlessly nasty to pass around
 pub const SPACESHIP_SPRITE_SIZE: f32 = 128.0;
+pub const NUM_LIVES_ON_STARTUP: u32 = 3;
 pub const SPACESHIP_SPRITE_FILE: &'static str = "spaceship.png";
 
 impl Plugin for SpaceshipPlugin {
@@ -20,29 +21,34 @@ impl Plugin for SpaceshipPlugin {
             .add_system(snowballs_screen_wrap)
             .add_system(snowballs_timeout)
             .add_event::<SpaceShipDestroyedEvent>()
-            .add_system(space_ship_destroy);
+            .add_system(on_space_ship_destroy);
     }
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let space_ship_sprite = SpaceShipSprite(asset_server.load(SPACESHIP_SPRITE_FILE));
+    spawn_spaceship(&mut commands, &space_ship_sprite, NUM_LIVES_ON_STARTUP);
+    commands.insert_resource(space_ship_sprite);
+    commands.insert_resource(SnowballSprite(asset_server.load("snowball.png")));
+}
+
+fn spawn_spaceship(commands: &mut Commands, space_ship_sprite: &SpaceShipSprite, lives_left: u32) {
     commands
         .spawn()
         .insert(SpaceShip {
-            lives_left: 3,
+            lives_left,
             alive: true,
         })
         .insert(SnowballShootingCooldown(0.0))
         .insert(MovementSpeed(Vec2::ZERO))
         .insert_bundle(SpriteBundle {
-            texture: asset_server.load(SPACESHIP_SPRITE_FILE),
+            texture: space_ship_sprite.0.clone(),
             transform: Transform {
                 scale: Vec3::new(0.5, 0.5, 1.0),
                 ..default()
             },
             ..default()
         });
-
-    commands.insert_resource(SnowballSprite(asset_server.load("snowball.png")));
 }
 
 #[derive(Component)]
@@ -50,6 +56,8 @@ pub struct SpaceShip {
     pub lives_left: u32,
     pub alive: bool,
 }
+
+pub struct SpaceShipSprite(pub Handle<Image>);
 
 impl SpaceShip {
     pub fn bounding_triangle(transform: &Transform) -> (Vec2, Vec2, Vec2) {
@@ -215,12 +223,12 @@ fn snowballs_timeout(
     }
 }
 
-fn space_ship_destroy(
+fn on_space_ship_destroy(
     mut commands: Commands,
     mut destroyed_events: EventReader<SpaceShipDestroyedEvent>,
+    space_ship_sprite: Res<SpaceShipSprite>,
 ) {
     for _ in destroyed_events.iter() {
-        println!("despawn!");
-        // TODO
+        spawn_spaceship(&mut commands, &*space_ship_sprite, 2); // TODO: lives
     }
 }
