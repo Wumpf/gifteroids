@@ -197,7 +197,7 @@ fn gifteroid_snowball_collision(
 fn gifteroid_spaceship_collision(
     mut commands: Commands,
     query_gifteroids: Query<(&Transform, &OrientedBox), With<GifteroidSize>>,
-    query_spaceship: Query<(Entity, &Transform), With<SpaceShip>>,
+    query_spaceship: Query<(Entity, &Transform, &SpaceShip)>,
     mut destroyed_events: EventWriter<SpaceShipDestroyedEvent>,
 ) {
     // Detect collision by checking line collisions. Not perfect, but good enough and easy to implement
@@ -205,7 +205,10 @@ fn gifteroid_spaceship_collision(
     if let Err(_) = query_spaceship.get_single() {
         return;
     }
-    let (spaceship_entity, spaceship_transform) = query_spaceship.single();
+    let (spaceship_entity, spaceship_transform, spaceship) = query_spaceship.single();
+    if spaceship.is_invincible() {
+        return;
+    }
     let (tri_a, tri_b, tri_c) = SpaceShip::bounding_triangle(spaceship_transform);
 
     for (transform_gifteroid, obb) in &query_gifteroids {

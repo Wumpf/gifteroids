@@ -5,13 +5,13 @@ use bevy::prelude::*;
 use crate::MovementSpeed;
 
 pub struct SpaceshipPlugin;
-
 pub struct SpaceShipDestroyedEvent(pub Entity);
 
 // could ofc read this from data, but needlessly nasty to pass around
-pub const SPACESHIP_SPRITE_SIZE: f32 = 128.0;
 pub const NUM_LIVES_ON_STARTUP: u32 = 3;
 pub const SPACESHIP_SPRITE_FILE: &'static str = "spaceship.png";
+const SPACESHIP_SPRITE_SIZE: f32 = 128.0;
+const SPAWN_INVINCIBLE_TIMER: f32 = 2.0;
 
 impl Plugin for SpaceshipPlugin {
     fn build(&self, app: &mut App) {
@@ -21,7 +21,8 @@ impl Plugin for SpaceshipPlugin {
             .add_system(snowballs_screen_wrap)
             .add_system(snowballs_timeout)
             .add_event::<SpaceShipDestroyedEvent>()
-            .add_system(on_space_ship_destroy);
+            .add_system(on_space_ship_destroy)
+            .add_system(invincibility);
     }
 }
 
@@ -36,8 +37,8 @@ fn spawn_spaceship(commands: &mut Commands, space_ship_sprite: &SpaceShipSprite,
     commands
         .spawn()
         .insert(SpaceShip {
+            state: SpaceShipState::Invincible(Duration::from_secs_f32(SPAWN_INVINCIBLE_TIMER)),
             lives_left,
-            alive: true,
         })
         .insert(SnowballShootingCooldown(0.0))
         .insert(MovementSpeed(Vec2::ZERO))
@@ -51,15 +52,28 @@ fn spawn_spaceship(commands: &mut Commands, space_ship_sprite: &SpaceShipSprite,
         });
 }
 
+enum SpaceShipState {
+    Normal,
+    Invincible(Duration),
+}
+
 #[derive(Component)]
 pub struct SpaceShip {
-    pub lives_left: u32,
-    pub alive: bool,
+    state: SpaceShipState,
+    lives_left: u32,
 }
 
 pub struct SpaceShipSprite(pub Handle<Image>);
 
 impl SpaceShip {
+    pub fn is_invincible(&self) -> bool {
+        if let SpaceShipState::Invincible(_) = self.state {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn bounding_triangle(transform: &Transform) -> (Vec2, Vec2, Vec2) {
         let position = transform.translation.truncate();
         let scale = transform.scale.x;
@@ -229,6 +243,28 @@ fn on_space_ship_destroy(
     space_ship_sprite: Res<SpaceShipSprite>,
 ) {
     for _ in destroyed_events.iter() {
-        spawn_spaceship(&mut commands, &*space_ship_sprite, 2); // TODO: lives
+        spawn_spaceship(&mut commands, &*space_ship_sprite, 2);
+    }
+}
+
+fn invincibility(mut query: Query<(&mut SpaceShip, &mut Sprite)>, time: Res<Time>) {
+    if let Ok((mut ship, mut sprite)) = query.get_single_mut() {
+        if let SpaceShipState::Invincible(invicinbility_time_left) = ship.state {
+            if let None = invicinbility_time_left.checked_sub(time.delta()) {
+                ship.state = SpaceShipState::Normal;
+                sprite.color = Color::WHITE;
+            } else {
+                ship.state = SpaceShipState::Invincible(invicinbility_time_left - time.delta());
+
+                let brightness = if (time.seconds_since_startup() * 4.0).fract() > 0.5 {
+                    0.75
+                } else {
+                    0.5
+                };
+                sprite.color = Color::rgba(brightness, brightness, brightness, 1.0);
+            }
+        } else {
+            sprite.color = Color::WHITE;
+        }
     }
 }
