@@ -37,7 +37,7 @@ fn setup_life_display(mut commands: Commands, asset_server: Res<AssetServer>) {
                     parent
                         .spawn_bundle(ImageBundle {
                             style: Style {
-                                size: Size::new(Val::Px(70.0), Val::Auto),
+                                size: Size::new(Val::Px(60.0), Val::Auto),
                                 margin: UiRect::all(Val::Px(10.0)),
                                 ..default()
                             },

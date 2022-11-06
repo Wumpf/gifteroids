@@ -167,7 +167,7 @@ fn gifteroid_snowball_collision(
         for (entity_snowball, transform_snowball) in &query_snowballs {
             // snowballs have a radius, but we ignore it here since they move fast enough
             if point_in_box(
-                &obb,
+                obb,
                 transform_snowball.translation.truncate(),
                 position_gifteroid,
             ) {
@@ -202,7 +202,7 @@ fn gifteroid_spaceship_collision(
 ) {
     // Detect collision by checking line collisions. Not perfect, but good enough and easy to implement
     // outer lines of spaceship
-    if let Err(_) = query_spaceship.get_single() {
+    if query_spaceship.get_single().is_err() {
         return;
     }
     let (spaceship_entity, spaceship_transform, spaceship) = query_spaceship.single();

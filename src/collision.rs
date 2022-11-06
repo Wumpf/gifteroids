@@ -22,5 +22,5 @@ pub fn line_line_test(start0: Vec2, end0: Vec2, start1: Vec2, end1: Vec2) -> boo
 
     let r = numerator1 / denominator;
     let s = numerator2 / denominator;
-    return r >= 0. && r <= 1. && s >= 0. && s <= 1.;
+    (0.0..=1.0).contains(&r) && (0.0..=1.0).contains(&s)
 }

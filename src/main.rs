@@ -6,6 +6,10 @@ mod gifteroids;
 mod spaceship;
 mod ui;
 
+// enum GameState {
+//     GameOver,
+// }
+
 fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins)
