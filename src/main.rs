@@ -3,6 +3,7 @@ use bevy::prelude::*;
 mod collision;
 mod debug_lines;
 mod gifteroids;
+mod score;
 mod spaceship;
 mod ui;
 
@@ -18,6 +19,7 @@ fn main() {
         .add_plugin(gifteroids::GifteroidsPlugin)
         .add_plugin(spaceship::SpaceshipPlugin)
         .add_plugin(ui::UiPlugin)
+        .add_plugin(score::ScorePlugin)
         .add_system(move_objects);
 
     #[cfg(feature = "debug_lines")]

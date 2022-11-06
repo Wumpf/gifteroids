@@ -11,7 +11,8 @@ pub struct GifteroidsPlugin;
 
 impl Plugin for GifteroidsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup.exclusive_system())
+        app.add_event::<GifteroidDestroyedEvent>()
+            .add_startup_system(setup.exclusive_system())
             .add_startup_system(spawn_gifteroids)
             .add_system(gifteroid_snowball_collision)
             .add_system(gifteroid_spaceship_collision)
@@ -21,6 +22,10 @@ impl Plugin for GifteroidsPlugin {
 
 struct GiftSprites {
     gift0: Handle<Image>,
+}
+
+pub struct GifteroidDestroyedEvent {
+    pub split_in_two: bool,
 }
 
 #[derive(Component)]
@@ -161,6 +166,7 @@ fn gifteroid_snowball_collision(
     sprites: Res<GiftSprites>,
     query_gifteroids: Query<(Entity, &Transform, &OrientedBox, &GifteroidSize)>,
     query_snowballs: Query<(Entity, &Transform), With<Snowball>>,
+    mut destroyed_events: EventWriter<GifteroidDestroyedEvent>,
 ) {
     for (entity_gifteroid, transform_gifteroid, obb, size) in &query_gifteroids {
         let position_gifteroid = transform_gifteroid.translation.truncate();
@@ -174,11 +180,16 @@ fn gifteroid_snowball_collision(
                 commands.entity(entity_gifteroid).despawn();
                 commands.entity(entity_snowball).despawn();
 
+                destroyed_events.send(GifteroidDestroyedEvent {
+                    split_in_two: matches!(size, GifteroidSize::Small),
+                });
+
                 let new_size = match size {
                     GifteroidSize::Large => GifteroidSize::Medium,
                     GifteroidSize::Medium => GifteroidSize::Small,
                     GifteroidSize::Small => continue,
                 };
+
                 for _ in 0..2 {
                     spawn_gifteroid(
                         &mut commands,
