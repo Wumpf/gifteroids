@@ -7,9 +7,9 @@ edition = "2021"
 
 [dependencies]
 # TODO: Trim down to necessary feature for small webapplication
-bevy = "0.8.1"
+bevy = "0.9"
 rand = "0.8.0"
-bevy_prototype_debug_lines = { version = "0.8", optional = true }
+bevy_prototype_debug_lines = { version = "0.9", optional = true }
 
 # TODO: Optimize for size when doing web output
 

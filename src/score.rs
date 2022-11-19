@@ -21,6 +21,7 @@ impl Plugin for ScorePlugin {
     }
 }
 
+#[derive(Resource)]
 pub struct Score(pub u32);
 
 fn setup(mut commands: Commands) {

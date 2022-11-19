@@ -12,7 +12,7 @@ pub struct GifteroidsPlugin;
 impl Plugin for GifteroidsPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<GifteroidDestroyedEvent>()
-            .add_startup_system(setup.exclusive_system())
+            .add_startup_system(setup)
             .add_startup_system(spawn_gifteroids)
             .add_system(gifteroid_snowball_collision)
             .add_system(gifteroid_spaceship_collision)
@@ -20,6 +20,7 @@ impl Plugin for GifteroidsPlugin {
     }
 }
 
+#[derive(Resource)]
 struct GiftSprites {
     gift0: Handle<Image>,
 }
@@ -118,7 +119,7 @@ fn spawn_gifteroid(
         axis1: Vec2::new(0.0, GIFTSPRITE_HALF_EXTENT_Y * scale).rotate(sprite_x_dir),
     };
 
-    commands.spawn_bundle(GifteroidBundle {
+    commands.spawn(GifteroidBundle {
         size,
         sprite: SpriteBundle {
             texture,

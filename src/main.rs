@@ -34,7 +34,7 @@ fn setup(mut commands: Commands, mut windows: ResMut<Windows>) {
     // Therefore, we resizing while the game is running is not supported.
     window.set_resizable(false);
 
-    commands.spawn_bundle(Camera2dBundle::default());
+    commands.spawn(Camera2dBundle::default());
 }
 
 #[derive(Component)]

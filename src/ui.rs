@@ -29,21 +29,18 @@ fn setup_life_display(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     let mut life_icons = Vec::new();
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
-                justify_content: JustifyContent::FlexStart,
-                align_items: AlignItems::FlexEnd,
-                align_self: AlignSelf::FlexEnd,
+                align_items: AlignItems::FlexStart,
                 ..default()
             },
-            color: Color::NONE.into(),
             ..default()
         })
         .with_children(|parent| {
             life_icons = (0..NUM_LIVES_ON_STARTUP)
                 .map(|_| {
                     parent
-                        .spawn_bundle(ImageBundle {
+                        .spawn(ImageBundle {
                             style: Style {
                                 size: Size::new(Val::Px(60.0), Val::Auto),
                                 margin: UiRect::all(Val::Px(10.0)),
@@ -57,12 +54,12 @@ fn setup_life_display(mut commands: Commands, asset_server: Res<AssetServer>) {
                 .collect();
         });
 
-    commands.spawn().insert(SpaceShipLiveDisplay { life_icons });
+    commands.spawn(SpaceShipLiveDisplay { life_icons });
 }
 
 fn setup_score_display(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
-        .spawn_bundle(
+        .spawn(
             TextBundle::from_section(
                 "999999",
                 TextStyle {

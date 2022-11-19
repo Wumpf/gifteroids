@@ -33,16 +33,16 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(SnowballSprite(asset_server.load("snowball.png")));
 }
 
-fn spawn_spaceship(commands: &mut Commands, space_ship_sprite: &SpaceShipSprite, lives_left: u32) {
+fn spawn_spaceship(commands: &mut Commands, space_ship_sprite: &SpaceShipSprite, _lives_left: u32) {
     commands
-        .spawn()
+        .spawn_empty()
         .insert(SpaceShip {
             state: SpaceShipState::Invincible(Duration::from_secs_f32(SPAWN_INVINCIBLE_TIMER)),
             //lives_left,
         })
         .insert(SnowballShootingCooldown(0.0))
         .insert(MovementSpeed(Vec2::ZERO))
-        .insert_bundle(SpriteBundle {
+        .insert(SpriteBundle {
             texture: space_ship_sprite.0.clone(),
             transform: Transform {
                 scale: Vec3::new(0.5, 0.5, 1.0),
@@ -63,6 +63,7 @@ pub struct SpaceShip {
     //lives_left: u32,
 }
 
+#[derive(Resource)]
 pub struct SpaceShipSprite(pub Handle<Image>);
 
 impl SpaceShip {
@@ -93,6 +94,7 @@ pub struct Snowball {
     spawn_time: Duration,
 }
 
+#[derive(Resource)]
 struct SnowballSprite(Handle<Image>);
 
 fn control_spaceship(
@@ -175,14 +177,14 @@ fn snowballs_shoot(
 
     cooldown.0 += SNOWBALL_COOLDOWN_SECONDS;
     commands
-        .spawn()
+        .spawn_empty()
         .insert(Snowball {
-            spawn_time: time.time_since_startup(),
+            spawn_time: time.elapsed(),
         })
         .insert(MovementSpeed(
             transform.rotation.mul_vec3(Vec3::Y).truncate() * SNOWBALL_SPEED,
         ))
-        .insert_bundle(SpriteBundle {
+        .insert(SpriteBundle {
             texture: snowball_sprite.0.clone(),
             transform: Transform {
                 translation: tri_a.extend(0.0),
@@ -222,9 +224,7 @@ fn snowballs_timeout(
 ) {
     const SNOWBALL_MAX_LIFE_TIME: Duration = Duration::new(1, 500_000_000);
 
-    let min_snowball_time = time
-        .time_since_startup()
-        .saturating_sub(SNOWBALL_MAX_LIFE_TIME);
+    let min_snowball_time = time.elapsed().saturating_sub(SNOWBALL_MAX_LIFE_TIME);
 
     for (entity, snowball) in &snowballs {
         if snowball.spawn_time < min_snowball_time {
@@ -252,7 +252,7 @@ fn invincibility(mut query: Query<(&mut SpaceShip, &mut Sprite)>, time: Res<Time
             } else {
                 ship.state = SpaceShipState::Invincible(invicinbility_time_left - time.delta());
 
-                let brightness = if (time.seconds_since_startup() * 4.0).fract() > 0.5 {
+                let brightness = if (time.elapsed_seconds() * 4.0).fract() > 0.5 {
                     0.75
                 } else {
                     0.5
