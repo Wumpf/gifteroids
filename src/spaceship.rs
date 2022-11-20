@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 
-use crate::MovementSpeed;
+use crate::{GameState, MovementSpeed};
 
 pub struct SpaceshipPlugin;
 pub struct SpaceShipDestroyedEvent {
@@ -17,22 +17,29 @@ const SPAWN_INVINCIBLE_TIMER: f32 = 2.0;
 
 impl Plugin for SpaceshipPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup)
-            .add_system(control_spaceship)
-            .add_system(snowballs_shoot)
-            .add_system(snowballs_screen_wrap)
-            .add_system(snowballs_timeout)
-            .add_event::<SpaceShipDestroyedEvent>()
-            .add_system(on_space_ship_destroy)
-            .add_system(invincibility);
+        app.add_event::<SpaceShipDestroyedEvent>()
+            .add_startup_system(setup)
+            .add_system_set(SystemSet::on_enter(GameState::Game).with_system(initial_spawn))
+            .add_system_set(
+                SystemSet::on_update(GameState::Game)
+                    .with_system(control_spaceship)
+                    .with_system(snowballs_shoot)
+                    .with_system(snowballs_screen_wrap)
+                    .with_system(snowballs_timeout)
+                    .with_system(on_space_ship_destroy)
+                    .with_system(invincibility),
+            );
     }
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let space_ship_sprite = SpaceShipSprite(asset_server.load(SPACESHIP_SPRITE_FILE));
-    spawn_spaceship(&mut commands, &space_ship_sprite, NUM_LIVES_ON_STARTUP);
     commands.insert_resource(space_ship_sprite);
     commands.insert_resource(SnowballSprite(asset_server.load("snowball.png")));
+}
+
+fn initial_spawn(mut commands: Commands, space_ship_sprite: Res<SpaceShipSprite>) {
+    spawn_spaceship(&mut commands, &space_ship_sprite, NUM_LIVES_ON_STARTUP);
 }
 
 fn spawn_spaceship(commands: &mut Commands, space_ship_sprite: &SpaceShipSprite, lives_left: u32) {
@@ -245,17 +252,13 @@ fn on_space_ship_destroy(
     let entity = query_spaceship.single().0;
     commands.entity(entity).despawn();
 
-    if destroyed_event.lives_left_before_destroy == 0 {
-        // TODO: gameover
-        error!("Game over");
-        return;
+    if destroyed_event.lives_left_before_destroy > 0 {
+        spawn_spaceship(
+            &mut commands,
+            &space_ship_sprite,
+            destroyed_event.lives_left_before_destroy - 1,
+        );
     }
-
-    spawn_spaceship(
-        &mut commands,
-        &space_ship_sprite,
-        destroyed_event.lives_left_before_destroy - 1,
-    );
 }
 
 fn invincibility(mut query: Query<(&mut SpaceShip, &mut Sprite)>, time: Res<Time>) {

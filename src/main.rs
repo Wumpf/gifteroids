@@ -7,20 +7,32 @@ mod score;
 mod spaceship;
 mod ui;
 
-// enum GameState {
-//     GameOver,
-// }
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub enum GameState {
+    Game,
+    GameOver,
+
+    // Not used for states, but useful for DespawnOnStateEnter
+    Any,
+}
+
+#[derive(Component)]
+pub struct DespawnOnStateEnter(GameState);
 
 fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins)
+        .add_state(GameState::Game)
         .insert_resource(ClearColor(Color::BLACK))
         .add_startup_system(setup)
         .add_plugin(gifteroids::GifteroidsPlugin)
         .add_plugin(spaceship::SpaceshipPlugin)
         .add_plugin(ui::UiPlugin)
         .add_plugin(score::ScorePlugin)
-        .add_system(move_objects);
+        .add_system_set(SystemSet::on_enter(GameState::Game).with_system(despawn_on_enter))
+        .add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(despawn_on_enter))
+        .add_system_set(SystemSet::on_update(GameState::Game).with_system(move_objects))
+        .add_system_set(SystemSet::on_update(GameState::GameOver).with_system(move_objects));
 
     #[cfg(feature = "debug_lines")]
     app.add_plugin(debug_lines::DebugLinesPlugin);
@@ -35,6 +47,19 @@ fn setup(mut commands: Commands, mut windows: ResMut<Windows>) {
     window.set_resizable(false);
 
     commands.spawn(Camera2dBundle::default());
+}
+
+fn despawn_on_enter(
+    mut commands: Commands,
+    query: Query<(Entity, &DespawnOnStateEnter)>,
+    state: Res<State<GameState>>,
+) {
+    let state = *state.current();
+    for (entity, kill_state) in &query {
+        if kill_state.0 == state || kill_state.0 == GameState::Any {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
 }
 
 #[derive(Component)]

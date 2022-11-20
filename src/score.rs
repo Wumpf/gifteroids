@@ -1,6 +1,6 @@
 use bevy::{prelude::*, time::FixedTimestep};
 
-use crate::gifteroids::GifteroidDestroyedEvent;
+use crate::{gifteroids::GifteroidDestroyedEvent, GameState};
 
 pub struct ScorePlugin;
 
@@ -11,10 +11,12 @@ const SCORE_PER_GIFTEROID: u32 = 100;
 
 impl Plugin for ScorePlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup)
-            .add_system(on_asteroid_destroyed)
+        app.add_system_set(SystemSet::on_enter(GameState::Game).with_system(setup))
             .add_system_set(
-                SystemSet::new()
+                SystemSet::on_update(GameState::Game).with_system(on_asteroid_destroyed),
+            )
+            .add_system_set(
+                SystemSet::on_update(GameState::Game)
                     .with_run_criteria(FixedTimestep::step(SCORE_REDUCTION_FREQUENCY_SECONDS))
                     .with_system(reduce_score),
             );

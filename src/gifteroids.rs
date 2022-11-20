@@ -4,7 +4,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 use crate::{
     collision::{line_line_test, point_in_box},
     spaceship::{Snowball, SpaceShip, SpaceShipDestroyedEvent, SpaceShipState},
-    MovementSpeed,
+    DespawnOnStateEnter, GameState, MovementSpeed,
 };
 
 pub struct GifteroidsPlugin;
@@ -12,11 +12,14 @@ pub struct GifteroidsPlugin;
 impl Plugin for GifteroidsPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<GifteroidDestroyedEvent>()
-            .add_startup_system(setup)
-            .add_startup_system(spawn_gifteroids)
-            .add_system(gifteroid_snowball_collision)
-            .add_system(gifteroid_spaceship_collision)
-            .add_system(screen_wrap_obb_entities);
+            .add_startup_system(on_load)
+            .add_system_set(SystemSet::on_enter(GameState::Game).with_system(spawn_gifteroids))
+            .add_system_set(
+                SystemSet::on_update(GameState::Game)
+                    .with_system(gifteroid_snowball_collision)
+                    .with_system(gifteroid_spaceship_collision)
+                    .with_system(screen_wrap_obb_entities),
+            );
     }
 }
 
@@ -43,6 +46,7 @@ struct GifteroidBundle {
     sprite: SpriteBundle,
     movement: MovementSpeed,
     obb: OrientedBox,
+    despawner: DespawnOnStateEnter,
 }
 
 #[derive(Component, Clone, Copy)]
@@ -52,10 +56,8 @@ enum GifteroidSize {
     Small = 2,
 }
 
-fn setup(world: &mut World) {
-    // operate on world directly so that other startup systems have the GiftSprites resources available
-    let asset_server = world.resource::<AssetServer>();
-    world.insert_resource(GiftSprites {
+fn on_load(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(GiftSprites {
         gift0: asset_server.load("gift.png"),
     });
 }
@@ -132,6 +134,7 @@ fn spawn_gifteroid(
         },
         movement: MovementSpeed(movement),
         obb,
+        despawner: DespawnOnStateEnter(GameState::Game),
     });
 }
 
