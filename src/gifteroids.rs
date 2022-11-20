@@ -3,7 +3,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 
 use crate::{
     collision::{line_line_test, point_in_box},
-    spaceship::{Snowball, SpaceShip, SpaceShipDestroyedEvent},
+    spaceship::{Snowball, SpaceShip, SpaceShipDestroyedEvent, SpaceShipState},
     MovementSpeed,
 };
 
@@ -207,22 +207,24 @@ fn gifteroid_snowball_collision(
 }
 
 fn gifteroid_spaceship_collision(
-    mut commands: Commands,
     query_gifteroids: Query<(&Transform, &OrientedBox), With<GifteroidSize>>,
-    query_spaceship: Query<(Entity, &Transform, &SpaceShip)>,
+    mut query_spaceship: Query<(&Transform, &mut SpaceShip)>,
     mut destroyed_events: EventWriter<SpaceShipDestroyedEvent>,
 ) {
-    // Detect collision by checking line collisions. Not perfect, but good enough and easy to implement
-    // outer lines of spaceship
     if query_spaceship.get_single().is_err() {
         return;
     }
-    let (spaceship_entity, spaceship_transform, spaceship) = query_spaceship.single();
-    if spaceship.is_invincible() {
+    let (spaceship_transform, mut spaceship) = query_spaceship.single_mut();
+    if matches!(
+        spaceship.state,
+        SpaceShipState::Invincible(_) | SpaceShipState::Destroyed
+    ) {
         return;
     }
     let (tri_a, tri_b, tri_c) = SpaceShip::bounding_triangle(spaceship_transform);
 
+    // Detect collision by checking line collisions. Not perfect, but good enough and easy to implement
+    // outer lines of spaceship
     for (transform_gifteroid, obb) in &query_gifteroids {
         let position_gifteroid = transform_gifteroid.translation.truncate();
 
@@ -245,8 +247,11 @@ fn gifteroid_spaceship_collision(
             || line_line_test(tri_c, tri_a, bottom_left, bottom_right)
             || line_line_test(tri_c, tri_a, bottom_right, top_right)
         {
-            destroyed_events.send(SpaceShipDestroyedEvent(spaceship_entity));
-            commands.entity(spaceship_entity).despawn();
+            spaceship.state = SpaceShipState::Destroyed;
+            destroyed_events.send(SpaceShipDestroyedEvent {
+                lives_left_before_destroy: spaceship.lives_left,
+            });
+
             break;
         }
     }

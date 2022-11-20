@@ -91,7 +91,7 @@ fn on_space_ship_destroy(
     for _ in destroyed_events.iter() {
         let display = &mut query.single_mut();
         if let Some(entity) = display.life_icons.pop() {
-            commands.entity(entity).despawn_recursive(); // TODO: despawn is the wrong strategy. want to be able to reset them
+            commands.entity(entity).despawn_recursive();
         }
     }
 }
