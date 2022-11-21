@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use crate::{
     score::Score,
     spaceship::{SpaceShipDestroyedEvent, NUM_LIVES_ON_STARTUP, SPACESHIP_SPRITE_FILE},
+    web_request::{publish_score, query_highscore},
     DespawnOnStateEnter, GameState,
 };
 
@@ -201,18 +202,11 @@ fn show_game_over(mut commands: Commands, fonts: Res<Fonts>) {
         });
 }
 
-struct ScoreEntry {
-    name: String,
-    score: u32,
-}
-
 fn show_highscore(mut commands: Commands, fonts: Res<Fonts>, score: Res<Score>) {
-    let scores = (0..10)
-        .map(|i| ScoreEntry {
-            name: format!("that is my {i} name"),
-            score: i * 100,
-        })
-        .collect::<Vec<_>>();
+    // Hack? We *need* to report online before querying the table.
+    // Easiest way to make sure of that is to put it into the same system.
+    // But should actually go to the score plugin in score.rs :/
+    info!("{:?}", publish_score(score.0)); // TODO: Error handling?
 
     commands
         .spawn(NodeBundle {
@@ -232,23 +226,39 @@ fn show_highscore(mut commands: Commands, fonts: Res<Fonts>, score: Res<Score>) 
             parent.spawn(fonts.text(format!("Your score was {}", score.0), 40.0));
             parent.spawn(fonts.text("High Score", 60.0));
 
-            parent
-                .spawn(NodeBundle {
-                    style: Style {
-                        flex_direction: FlexDirection::Row,
-                        ..default()
-                    },
-                    ..default()
-                })
-                .add_children(|parent| {
-                    spawn_score_column(
-                        &fonts,
-                        parent,
-                        (1..(scores.len() + 1)).map(|i| format!("{i}.")),
-                    );
-                    spawn_score_column(&fonts, parent, scores.iter().map(|s| s.name.clone()));
-                    spawn_score_column(&fonts, parent, scores.iter().map(|s| s.score.to_string()));
-                });
+            match query_highscore() {
+                Ok(highscore) => {
+                    let mut scores = highscore.iter().take(10).collect::<Vec<_>>();
+                    scores.sort_by(|(_, score0), (_, score1)| score1.cmp(score0));
+
+                    parent
+                        .spawn(NodeBundle {
+                            style: Style {
+                                flex_direction: FlexDirection::Row,
+                                ..default()
+                            },
+                            ..default()
+                        })
+                        .add_children(|parent| {
+                            spawn_score_column(
+                                &fonts,
+                                parent,
+                                (1..(scores.len() + 1)).map(|i| format!("{i}.")),
+                            );
+                            spawn_score_column(&fonts, parent, scores.iter().map(|s| s.0.clone()));
+                            spawn_score_column(
+                                &fonts,
+                                parent,
+                                scores.iter().map(|s| s.1.to_string()),
+                            );
+                        });
+                }
+                Err(error) => {
+                    parent.spawn(fonts.text("Failed to query highscore:", 25.0));
+                    parent.spawn(fonts.text(error.to_string(), 25.0));
+                }
+            }
+
             parent.spawn(fonts.text("Press Enter to try again", 40.0));
         });
 }

@@ -6,6 +6,7 @@ mod gifteroids;
 mod score;
 mod spaceship;
 mod ui;
+mod web_request;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum GameState {
