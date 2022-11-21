@@ -18,7 +18,8 @@ impl Plugin for GifteroidsPlugin {
                 SystemSet::on_update(GameState::Game)
                     .with_system(gifteroid_snowball_collision)
                     .with_system(gifteroid_spaceship_collision)
-                    .with_system(screen_wrap_obb_entities),
+                    .with_system(screen_wrap_obb_entities)
+                    .with_system(check_win_condition),
             );
     }
 }
@@ -69,7 +70,7 @@ fn spawn_gifteroids(windows: Res<Windows>, sprites: Res<GiftSprites>, mut comman
         y: window.height(),
     };
 
-    const GIFTEROIDS_SPAWN_COUNT: u32 = 8;
+    const GIFTEROIDS_SPAWN_COUNT: u32 = 6;
     const GIFTEROIDS_SPAWN_PLAYER_CLEARANCE: f32 = 80.0;
 
     let mut rng = StdRng::seed_from_u64(123); // Fixed seed so we get the same start conditions every time.
@@ -257,5 +258,20 @@ fn gifteroid_spaceship_collision(
 
             break;
         }
+    }
+}
+
+fn check_win_condition(
+    mut events: EventReader<GifteroidDestroyedEvent>,
+    query_gifteroids: Query<With<GifteroidSize>>,
+    mut state: ResMut<State<GameState>>,
+) {
+    if events.iter().next().is_none() {
+        return;
+    };
+    events.clear();
+
+    if query_gifteroids.is_empty() {
+        state.set(GameState::Highscore).unwrap();
     }
 }

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 
-use crate::{GameState, MovementSpeed};
+use crate::{DespawnOnStateEnter, GameState, MovementSpeed};
 
 pub struct SpaceshipPlugin;
 pub struct SpaceShipDestroyedEvent {
@@ -58,7 +58,8 @@ fn spawn_spaceship(commands: &mut Commands, space_ship_sprite: &SpaceShipSprite,
                 ..default()
             },
             ..default()
-        });
+        })
+        .insert(DespawnOnStateEnter(GameState::Any));
 }
 
 pub enum SpaceShipState {

@@ -24,6 +24,10 @@ impl Plugin for UiPlugin {
             .add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(show_game_over))
             .add_system_set(
                 SystemSet::on_update(GameState::GameOver).with_system(start_game_on_enter),
+            )
+            .add_system_set(SystemSet::on_enter(GameState::Highscore).with_system(show_highscore))
+            .add_system_set(
+                SystemSet::on_update(GameState::Highscore).with_system(start_game_on_enter),
             );
     }
 }
@@ -36,6 +40,19 @@ struct SpaceShipLiveDisplay {
 #[derive(Resource)]
 struct Fonts {
     font: Handle<Font>,
+}
+
+impl Fonts {
+    fn text(&self, text: impl Into<String>, font_size: f32) -> TextBundle {
+        TextBundle::from_section(
+            text,
+            TextStyle {
+                font: self.font.clone(),
+                font_size,
+                color: Color::WHITE,
+            },
+        )
+    }
 }
 
 const BACKGROUND_COLOR: BackgroundColor = BackgroundColor(Color::rgba(0.0, 0.0, 0.0, 0.5));
@@ -79,20 +96,21 @@ fn setup_life_display(mut commands: Commands, asset_server: Res<AssetServer>) {
                         .id()
                 })
                 .collect();
-        });
+        })
+        .insert(DespawnOnStateEnter(GameState::Any));
 
     commands
         .spawn(SpaceShipLiveDisplay { life_icons })
         .insert(DespawnOnStateEnter(GameState::Any));
 }
 
-fn setup_score_display(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup_score_display(mut commands: Commands, fonts: Res<Fonts>) {
     commands
         .spawn(
             TextBundle::from_section(
                 "999999",
                 TextStyle {
-                    font: asset_server.load("Ubuntu-Regular.ttf"), // TODO: use font resource
+                    font: fonts.font.clone(),
                     font_size: 80.0,
                     color: Color::WHITE,
                 },
@@ -180,5 +198,85 @@ fn show_game_over(mut commands: Commands, fonts: Res<Fonts>) {
                     color: Color::WHITE,
                 },
             ));
+        });
+}
+
+struct ScoreEntry {
+    name: String,
+    score: u32,
+}
+
+fn show_highscore(mut commands: Commands, fonts: Res<Fonts>, score: Res<Score>) {
+    let scores = (0..10)
+        .map(|i| ScoreEntry {
+            name: format!("that is my {i} name"),
+            score: i * 100,
+        })
+        .collect::<Vec<_>>();
+
+    commands
+        .spawn(NodeBundle {
+            style: Style {
+                margin: UiRect::all(Val::Auto),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            background_color: BACKGROUND_COLOR,
+            ..default()
+        })
+        .insert(DespawnOnStateEnter(GameState::Any))
+        .with_children(|parent| {
+            parent.spawn(fonts.text("You prevented christmas!", 100.0));
+            parent.spawn(fonts.text(format!("Your score was {}", score.0), 40.0));
+            parent.spawn(fonts.text("High Score", 60.0));
+
+            parent
+                .spawn(NodeBundle {
+                    style: Style {
+                        flex_direction: FlexDirection::Row,
+                        ..default()
+                    },
+                    ..default()
+                })
+                .add_children(|parent| {
+                    spawn_score_column(
+                        &fonts,
+                        parent,
+                        (1..(scores.len() + 1)).map(|i| format!("{i}.")),
+                    );
+                    spawn_score_column(&fonts, parent, scores.iter().map(|s| s.name.clone()));
+                    spawn_score_column(&fonts, parent, scores.iter().map(|s| s.score.to_string()));
+                });
+            parent.spawn(fonts.text("Press Enter to try again", 40.0));
+        });
+}
+
+fn spawn_score_column(
+    fonts: &Res<Fonts>,
+    parent: &mut ChildBuilder,
+    strings: impl Iterator<Item = String>,
+) {
+    parent
+        .spawn(NodeBundle {
+            style: Style {
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                flex_direction: FlexDirection::Column,
+                margin: UiRect {
+                    left: Val::Px(10.0),
+                    right: Val::Px(10.0),
+                    top: Val::Px(20.0),
+                    bottom: Val::Px(20.0),
+                },
+                ..default()
+            },
+            ..default()
+        })
+        .add_children(|parent| {
+            for s in strings {
+                parent.spawn(fonts.text(s, 25.0));
+            }
         });
 }

@@ -11,6 +11,7 @@ mod ui;
 pub enum GameState {
     Game,
     GameOver,
+    Highscore,
 
     // Not used for states, but useful for DespawnOnStateEnter
     Any,
@@ -31,6 +32,7 @@ fn main() {
         .add_plugin(score::ScorePlugin)
         .add_system_set(SystemSet::on_enter(GameState::Game).with_system(despawn_on_enter))
         .add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(despawn_on_enter))
+        .add_system_set(SystemSet::on_enter(GameState::Highscore).with_system(despawn_on_enter))
         .add_system_set(SystemSet::on_update(GameState::Game).with_system(move_objects))
         .add_system_set(SystemSet::on_update(GameState::GameOver).with_system(move_objects));
 
