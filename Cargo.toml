@@ -9,8 +9,11 @@ edition = "2021"
 # TODO: Trim down to necessary feature for small webapplication
 bevy = "0.9"
 rand = "0.8.0"
+ehttp = "0.2"
+parking_lot = "0.12"
+tinyjson = "2"
+
 bevy_prototype_debug_lines = { version = "0.9", optional = true }
-reqwest = { version = "0.11", features = ["blocking", "json"] }
 
 # TODO: Optimize for size when doing web output
 

@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use bevy::prelude::*;
+use parking_lot::Mutex;
 
 use crate::{
     score::Score,
@@ -26,9 +29,13 @@ impl Plugin for UiPlugin {
             .add_system_set(
                 SystemSet::on_update(GameState::GameOver).with_system(start_game_on_enter),
             )
-            .add_system_set(SystemSet::on_enter(GameState::Highscore).with_system(show_highscore))
             .add_system_set(
-                SystemSet::on_update(GameState::Highscore).with_system(start_game_on_enter),
+                SystemSet::on_enter(GameState::Highscore).with_system(setup_highscore_screen),
+            )
+            .add_system_set(
+                SystemSet::on_update(GameState::Highscore)
+                    .with_system(start_game_on_enter)
+                    .with_system(check_score_query),
             );
     }
 }
@@ -202,12 +209,72 @@ fn show_game_over(mut commands: Commands, fonts: Res<Fonts>) {
         });
 }
 
-fn show_highscore(mut commands: Commands, fonts: Res<Fonts>, score: Res<Score>) {
-    // Hack? We *need* to report online before querying the table.
-    // Easiest way to make sure of that is to put it into the same system.
-    // But should actually go to the score plugin in score.rs :/
-    info!("{:?}", publish_score(score.0)); // TODO: Error handling?
+enum HighscorePublishAndQueryResult {
+    Pending,
+    FailedToPublish(String),
+    FailedToQuery(String),
+    Success(String),
+}
 
+#[derive(Resource)]
+struct HighscoreDisplay {
+    processed_query_result: bool,
+    highscore_publish_and_query_result: Arc<Mutex<HighscorePublishAndQueryResult>>,
+    ui_entity: Entity,
+}
+
+fn setup_highscore_screen(mut commands: Commands, fonts: Res<Fonts>, score: Res<Score>) {
+    let ui_entity = spawn_highscore_ui(
+        &mut commands,
+        &fonts,
+        &score,
+        &HighscorePublishAndQueryResult::Pending,
+    );
+
+    let highscore_display = HighscoreDisplay {
+        processed_query_result: false,
+        highscore_publish_and_query_result: Arc::new(Mutex::new(
+            HighscorePublishAndQueryResult::Pending,
+        )),
+        ui_entity,
+    };
+    {
+        let query_result = highscore_display.highscore_publish_and_query_result.clone();
+        publish_score(score.0, move |result| {
+            match result {
+                Ok(response) => {
+                    if response.status != 200 {
+                        *query_result.lock() =
+                            HighscorePublishAndQueryResult::FailedToPublish(response.status_text);
+                        return;
+                    }
+                    query_highscore(move |result| match result {
+                        Ok(response) => {
+                            *query_result.lock() = HighscorePublishAndQueryResult::Success(
+                                String::from_utf8(response.bytes).unwrap(),
+                            );
+                        }
+                        Err(err) => {
+                            *query_result.lock() =
+                                HighscorePublishAndQueryResult::FailedToQuery(err);
+                        }
+                    });
+                }
+                Err(err) => {
+                    *query_result.lock() = HighscorePublishAndQueryResult::FailedToPublish(err);
+                }
+            };
+        });
+    }
+    commands.insert_resource(highscore_display);
+}
+
+fn spawn_highscore_ui(
+    commands: &mut Commands,
+    fonts: &Fonts,
+    score: &Score,
+    score_query: &HighscorePublishAndQueryResult,
+) -> Entity {
     commands
         .spawn(NodeBundle {
             style: Style {
@@ -226,45 +293,88 @@ fn show_highscore(mut commands: Commands, fonts: Res<Fonts>, score: Res<Score>) 
             parent.spawn(fonts.text(format!("Your score was {}", score.0), 40.0));
             parent.spawn(fonts.text("High Score", 60.0));
 
-            match query_highscore() {
-                Ok(highscore) => {
-                    let mut scores = highscore.iter().take(10).collect::<Vec<_>>();
-                    scores.sort_by(|(_, score0), (_, score1)| score1.cmp(score0));
-
-                    parent
-                        .spawn(NodeBundle {
-                            style: Style {
-                                flex_direction: FlexDirection::Row,
-                                ..default()
-                            },
-                            ..default()
-                        })
-                        .add_children(|parent| {
-                            spawn_score_column(
-                                &fonts,
-                                parent,
-                                (1..(scores.len() + 1)).map(|i| format!("{i}.")),
-                            );
-                            spawn_score_column(&fonts, parent, scores.iter().map(|s| s.0.clone()));
-                            spawn_score_column(
-                                &fonts,
-                                parent,
-                                scores.iter().map(|s| s.1.to_string()),
-                            );
-                        });
+            match score_query {
+                HighscorePublishAndQueryResult::Pending => {
+                    parent.spawn(fonts.text("... Submitting Highscore ...", 40.0));
                 }
-                Err(error) => {
+                HighscorePublishAndQueryResult::FailedToPublish(err) => {
+                    parent.spawn(fonts.text("Failed to publish highscore:", 25.0));
+                    parent.spawn(fonts.text(err, 25.0));
+                }
+                HighscorePublishAndQueryResult::FailedToQuery(err) => {
                     parent.spawn(fonts.text("Failed to query highscore:", 25.0));
-                    parent.spawn(fonts.text(error.to_string(), 25.0));
+                    parent.spawn(fonts.text(err, 25.0));
+                }
+                HighscorePublishAndQueryResult::Success(score_response) => {
+                    // oh god. a json parser. for this?!
+                    // But handling all corner cases of json unicode characters is not something I want to handle here...
+                    match score_response.parse::<tinyjson::JsonValue>() {
+                        Ok(json) => {
+                            if let tinyjson::JsonValue::Object(highscore) = json {
+                                let mut scores = highscore
+                                    .iter()
+                                    .take(10)
+                                    .map(|(key, value)| {
+                                        (
+                                            key,
+                                            match value {
+                                                tinyjson::JsonValue::Number(i) => *i as u32,
+                                                _ => 0, // eh whatever. it's late.
+                                            },
+                                        )
+                                    })
+                                    .collect::<Vec<_>>();
+                                scores.sort_by(|(_, score0), (_, score1)| score1.cmp(score0));
+
+                                parent
+                                    .spawn(NodeBundle {
+                                        style: Style {
+                                            flex_direction: FlexDirection::Row,
+                                            ..default()
+                                        },
+                                        ..default()
+                                    })
+                                    .add_children(|parent| {
+                                        spawn_score_column(
+                                            fonts,
+                                            parent,
+                                            (1..(scores.len() + 1)).map(|i| format!("{i}.")),
+                                        );
+                                        spawn_score_column(
+                                            fonts,
+                                            parent,
+                                            scores.iter().map(|s| s.0.clone()),
+                                        );
+                                        spawn_score_column(
+                                            fonts,
+                                            parent,
+                                            scores.iter().map(|s| s.1.to_string()),
+                                        );
+                                    });
+                            } else {
+                                parent.spawn(
+                                    fonts.text(
+                                        "Highscore was not a json dictionary as expected",
+                                        25.0,
+                                    ),
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            parent.spawn(fonts.text("Failed to parse highscore json:", 25.0));
+                            parent.spawn(fonts.text(format!("{err}"), 25.0));
+                        }
+                    }
                 }
             }
 
             parent.spawn(fonts.text("Press Enter to try again", 40.0));
-        });
+        })
+        .id()
 }
 
 fn spawn_score_column(
-    fonts: &Res<Fonts>,
+    fonts: &Fonts,
     parent: &mut ChildBuilder,
     strings: impl Iterator<Item = String>,
 ) {
@@ -289,4 +399,26 @@ fn spawn_score_column(
                 parent.spawn(fonts.text(s, 25.0));
             }
         });
+}
+
+fn check_score_query(
+    mut commands: Commands,
+    fonts: Res<Fonts>,
+    score: Res<Score>,
+    mut score_query: ResMut<HighscoreDisplay>,
+) {
+    if score_query.processed_query_result {
+        return;
+    }
+
+    score_query.ui_entity = {
+        let result_lock = score_query.highscore_publish_and_query_result.lock();
+        let result = &*result_lock;
+        if matches!(result, HighscorePublishAndQueryResult::Pending) {
+            return;
+        }
+        commands.entity(score_query.ui_entity).despawn_recursive();
+        spawn_highscore_ui(&mut commands, &fonts, &score, result)
+    };
+    score_query.processed_query_result = true;
 }
