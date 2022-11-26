@@ -6,7 +6,15 @@ rust-version = "1.65"
 
 [dependencies]
 # TODO: Trim down to necessary feature for small webapplication
-bevy = "0.9"
+bevy = { version = "0.9", default-features = false, features = [
+    "bevy_asset",
+    "bevy_winit",
+    "bevy_core_pipeline",
+    "bevy_sprite",
+    "bevy_text",
+    "bevy_ui",
+    "png",
+] }
 rand = "0.8.0"
 ehttp = "0.2"
 parking_lot = "0.12"
@@ -14,7 +22,9 @@ tinyjson = "2"
 
 bevy_prototype_debug_lines = { version = "0.9", optional = true }
 
-# TODO: Optimize for size when doing web output
+[profile.release]
+lto = true
+opt-level = 'z'
 
 [features]
 debug_lines = ["dep:bevy_prototype_debug_lines"]
