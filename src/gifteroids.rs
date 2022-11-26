@@ -262,15 +262,9 @@ fn gifteroid_spaceship_collision(
 }
 
 fn check_win_condition(
-    mut events: EventReader<GifteroidDestroyedEvent>,
     query_gifteroids: Query<With<GifteroidSize>>,
     mut state: ResMut<State<GameState>>,
 ) {
-    if events.iter().next().is_none() {
-        return;
-    };
-    events.clear();
-
     if query_gifteroids.is_empty() {
         state.set(GameState::Highscore).unwrap();
     }
