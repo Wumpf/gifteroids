@@ -23,7 +23,8 @@ tinyjson = "2"
 bevy_prototype_debug_lines = { version = "0.9", optional = true }
 
 [profile.release]
-lto = true
+lto = "fat"
+codegen-units = 1
 opt-level = 'z'
 
 [features]
