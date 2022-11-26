@@ -25,30 +25,5 @@
 			"group": "build",
 			"label": "rust: cargo build RELEASE"
 		},
-		{
-			"type": "shell",
-			"command": "wasm-bindgen --out-dir ./out/ --target web ./target/wasm32-unknown-unknown/release/gifteroids.wasm",
-			"dependsOn": [
-				"rust: cargo build RELEASE"
-			],
-			"label": "web export",
-			"problemMatcher": []
-		},
-		{
-			"type": "cargo",
-			"command": "run",
-			"args": [
-				"--target",
-				"wasm32-unknown-unknown"
-			],
-			"problemMatcher": [
-				"$rustc"
-			],
-			"label": "web test",
-			"group": {
-				"kind": "test",
-				"isDefault": true
-			}
-		}
 	]
 }
