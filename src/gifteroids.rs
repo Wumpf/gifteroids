@@ -195,13 +195,16 @@ fn gifteroid_snowball_collision(
                     GifteroidSize::Small => continue,
                 };
 
+                let seed = query_gifteroids.iter().len();
+                let mut rng = StdRng::seed_from_u64(seed as u64);
+
                 for _ in 0..2 {
                     spawn_gifteroid(
                         &mut commands,
                         sprites.gift0.clone(),
                         position_gifteroid,
-                        rand::thread_rng().gen_range(0.0..std::f32::consts::TAU),
-                        rand::thread_rng().gen_range(0.0..std::f32::consts::TAU),
+                        rng.gen_range(0.0..std::f32::consts::TAU),
+                        rng.gen_range(0.0..std::f32::consts::TAU),
                         new_size,
                     )
                 }
