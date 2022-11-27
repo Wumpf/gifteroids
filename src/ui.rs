@@ -244,17 +244,21 @@ fn setup_highscore_screen(mut commands: Commands, fonts: Res<Fonts>, score: Res<
             match result {
                 Ok(response) => {
                     if response.status != 200 {
+                        error!("Failed to publish score: {}", response.status_text);
                         *query_result.lock() =
                             HighscorePublishAndQueryResult::FailedToPublish(response.status_text);
                         return;
                     }
+                    info!("Successfully published score");
                     query_highscore(move |result| match result {
                         Ok(response) => {
+                            info!("Successfully queried score");
                             *query_result.lock() = HighscorePublishAndQueryResult::Success(
                                 String::from_utf8(response.bytes).unwrap(),
                             );
                         }
                         Err(err) => {
+                            error!("Failed to query score: {}", err);
                             *query_result.lock() =
                                 HighscorePublishAndQueryResult::FailedToQuery(err);
                         }
