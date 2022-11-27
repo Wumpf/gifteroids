@@ -70,7 +70,7 @@ fn spawn_gifteroids(windows: Res<Windows>, sprites: Res<GiftSprites>, mut comman
         y: window.height(),
     };
 
-    const GIFTEROIDS_SPAWN_COUNT: u32 = 6;
+    const GIFTEROIDS_SPAWN_COUNT: u32 = 7;
     const GIFTEROIDS_SPAWN_PLAYER_CLEARANCE: f32 = 80.0;
 
     let mut rng = StdRng::seed_from_u64(123); // Fixed seed so we get the same start conditions every time.
@@ -101,7 +101,7 @@ pub fn spawn_gifteroid(
     rand: &mut StdRng,
     size: GifteroidSize,
 ) {
-    const GIFTEROIDS_BASE_SPEED: f32 = 50.0;
+    const GIFTEROIDS_BASE_SPEED: f32 = 60.0;
 
     // manual measurement from gift.png
     const GIFTSPRITE_HALF_EXTENT_X: f32 = 46.0;

@@ -114,7 +114,7 @@ fn santa_spawn(
     time: Res<Time>,
     windows: Res<Windows>,
 ) {
-    const SECONDS_BETWEEN_SPAWNS: f32 = 8.0;
+    const SECONDS_BETWEEN_SPAWNS: f32 = 12.0;
     if (time.elapsed() - spawn_timer.last_spawn).as_secs_f32() < SECONDS_BETWEEN_SPAWNS {
         return;
     }

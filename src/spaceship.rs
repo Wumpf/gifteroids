@@ -10,7 +10,7 @@ pub struct SpaceShipDestroyedEvent {
 }
 
 // could ofc read this from data, but needlessly nasty to pass around
-pub const NUM_LIVES_ON_STARTUP: u32 = 3;
+pub const NUM_LIVES_ON_STARTUP: u32 = 4;
 pub const SPACESHIP_SPRITE_FILE: &str = "spaceship.png";
 const SPACESHIP_SPRITE_SIZE: f32 = 128.0;
 const SPAWN_INVINCIBLE_TIMER: f32 = 2.0;
@@ -112,7 +112,7 @@ fn control_spaceship(
 ) {
     const ACCELERATION: f32 = 400.0;
     const ROTATION_SPEED: f32 = 2.0;
-    const FRICTION: f32 = 0.5;
+    const FRICTION: f32 = 0.8;
 
     if query.get_single().is_err() {
         return;
@@ -199,7 +199,8 @@ fn snowballs_shoot(
                 ..default()
             },
             ..default()
-        });
+        })
+        .insert(DespawnOnStateEnter(GameState::Any));
 }
 
 fn snowballs_screen_wrap(
