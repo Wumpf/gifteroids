@@ -1,7 +1,7 @@
 use crate::gifteroids::OrientedBox;
 use bevy::prelude::Vec2;
 
-pub fn point_in_box(obb: &OrientedBox, bb_pos: Vec2, point: Vec2) -> bool {
+pub fn point_in_obb(obb: &OrientedBox, bb_pos: Vec2, point: Vec2) -> bool {
     let box_lensq0 = obb.axis0.length_squared();
     let box_lensq1 = obb.axis1.length_squared();
     let to_bb = bb_pos - point;

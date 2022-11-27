@@ -3,6 +3,7 @@ use bevy::prelude::*;
 mod collision;
 mod debug_lines;
 mod gifteroids;
+mod santa;
 mod score;
 mod spaceship;
 mod ui;
@@ -31,6 +32,7 @@ fn main() {
         .add_plugin(spaceship::SpaceshipPlugin)
         .add_plugin(ui::UiPlugin)
         .add_plugin(score::ScorePlugin)
+        .add_plugin(santa::SantaPlugin)
         .add_system_set(SystemSet::on_enter(GameState::Game).with_system(despawn_on_enter))
         .add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(despawn_on_enter))
         .add_system_set(SystemSet::on_enter(GameState::Highscore).with_system(despawn_on_enter))

@@ -18,7 +18,7 @@ const SPAWN_INVINCIBLE_TIMER: f32 = 2.0;
 impl Plugin for SpaceshipPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<SpaceShipDestroyedEvent>()
-            .add_startup_system(setup)
+            .add_startup_system(on_load)
             .add_system_set(SystemSet::on_enter(GameState::Game).with_system(initial_spawn))
             .add_system_set(
                 SystemSet::on_update(GameState::Game)
@@ -32,7 +32,7 @@ impl Plugin for SpaceshipPlugin {
     }
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn on_load(mut commands: Commands, asset_server: Res<AssetServer>) {
     let space_ship_sprite = SpaceShipSprite(asset_server.load(SPACESHIP_SPRITE_FILE));
     commands.insert_resource(space_ship_sprite);
     commands.insert_resource(SnowballSprite(asset_server.load("snowball.png")));

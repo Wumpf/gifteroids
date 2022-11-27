@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 use crate::{
-    collision::{line_line_test, point_in_box},
+    collision::{line_line_test, point_in_obb},
     spaceship::{Snowball, SpaceShip, SpaceShipDestroyedEvent, SpaceShipState},
     DespawnOnStateEnter, GameState, MovementSpeed,
 };
@@ -25,8 +25,8 @@ impl Plugin for GifteroidsPlugin {
 }
 
 #[derive(Resource)]
-struct GiftSprites {
-    gift0: Handle<Image>,
+pub struct GiftSprites {
+    pub gift0: Handle<Image>,
 }
 
 pub struct GifteroidDestroyedEvent {
@@ -51,7 +51,7 @@ struct GifteroidBundle {
 }
 
 #[derive(Component, Clone, Copy)]
-enum GifteroidSize {
+pub enum GifteroidSize {
     Large = 0,
     Medium = 1,
     Small = 2,
@@ -84,26 +84,21 @@ fn spawn_gifteroids(windows: Res<Windows>, sprites: Res<GiftSprites>, mut comman
                 * if rng.gen::<bool>() { -1.0 } else { 1.0 },
         };
 
-        let movement_angle = rng.gen_range(0.0..std::f32::consts::TAU);
-        let sprite_angle = rng.gen_range(0.0..std::f32::consts::TAU);
-
         spawn_gifteroid(
             &mut commands,
             sprites.gift0.clone(),
             position,
-            movement_angle,
-            sprite_angle,
+            &mut rng,
             GifteroidSize::Large,
         )
     }
 }
 
-fn spawn_gifteroid(
+pub fn spawn_gifteroid(
     commands: &mut Commands,
     texture: Handle<Image>,
     position: Vec2,
-    movement_angle: f32,
-    sprite_angle: f32,
+    rand: &mut StdRng,
     size: GifteroidSize,
 ) {
     const GIFTEROIDS_BASE_SPEED: f32 = 50.0;
@@ -111,6 +106,9 @@ fn spawn_gifteroid(
     // manual measurement from gift.png
     const GIFTSPRITE_HALF_EXTENT_X: f32 = 46.0;
     const GIFTSPRITE_HALF_EXTENT_Y: f32 = 64.0;
+
+    let movement_angle = rand.gen_range(0.0..std::f32::consts::TAU);
+    let sprite_angle = rand.gen_range(0.0..std::f32::consts::TAU);
 
     let speed = GIFTEROIDS_BASE_SPEED * (size as i32 + 1) as f32; // TODO: Vary this?
     let scale = 0.5_f32.powi(size as i32);
@@ -177,7 +175,7 @@ fn gifteroid_snowball_collision(
         let position_gifteroid = transform_gifteroid.translation.truncate();
         for (entity_snowball, transform_snowball) in &query_snowballs {
             // snowballs have a radius, but we ignore it here since they move fast enough
-            if point_in_box(
+            if point_in_obb(
                 obb,
                 transform_snowball.translation.truncate(),
                 position_gifteroid,
@@ -203,8 +201,7 @@ fn gifteroid_snowball_collision(
                         &mut commands,
                         sprites.gift0.clone(),
                         position_gifteroid,
-                        rng.gen_range(0.0..std::f32::consts::TAU),
-                        rng.gen_range(0.0..std::f32::consts::TAU),
+                        &mut rng,
                         new_size,
                     )
                 }
