@@ -17,6 +17,7 @@ const SCORE_LOSS_PER_LIFE_LOST: u32 = 100;
 impl Plugin for ScorePlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup)
+            .add_system_set(SystemSet::on_enter(GameState::Game).with_system(setup))
             .add_system_set(
                 SystemSet::on_update(GameState::Game)
                     .with_system(on_asteroid_destroyed)
