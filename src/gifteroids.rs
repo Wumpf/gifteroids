@@ -57,11 +57,26 @@ struct GifteroidBundle {
     despawner: DespawnOnStateEnter,
 }
 
+#[cfg(feature = "rerun")]
+use rerun::external::re_log_types::external::{arrow2, arrow2_convert};
+
 #[derive(Component, Clone, Copy)]
+#[cfg_attr(
+    feature = "rerun",
+    derive(arrow2_convert::ArrowField, arrow2_convert::ArrowSerialize,),
+    arrow_field(type = "dense")
+)]
 pub enum GifteroidSize {
     Large = 0,
     Medium = 1,
     Small = 2,
+}
+
+#[cfg(feature = "rerun")]
+impl rerun::Component for GifteroidSize {
+    fn name() -> rerun::ComponentName {
+        "ext.GifteroidSize".into()
+    }
 }
 
 fn on_load(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -282,10 +297,22 @@ fn log_gifteroid_despawn(index: u32) {
     #[cfg(feature = "rerun")]
     {
         if let Some(rec) = rerun::RecordingStream::global(rerun::RecordingType::Data) {
+            let time = crate::rerun_time();
             rec.record_path_op(
-                crate::rerun_time(),
-                rerun::log::PathOp::clear(true, format!("collision/gifteroid/{index}").into()),
+                time.clone(),
+                rerun::log::PathOp::clear(true, format!("collision/gifteroids/{index}").into()),
             );
+
+            rerun::MsgSender::new("log")
+                .with_timepoint(time.clone())
+                .with_component(&[rerun::components::TextEntry::new(
+                    format!("despawn {index}"),
+                    Some("INFO".to_owned()),
+                )])
+                .unwrap()
+                .send(&rec)
+                .map_err(anyhow::Error::msg)
+                .ok();
         }
     }
 }
@@ -293,7 +320,7 @@ fn log_gifteroid_despawn(index: u32) {
 #[cfg(feature = "rerun")]
 fn send_collision_geom_to_rerun(
     query_spaceship: Query<&Transform, With<SpaceShip>>,
-    query_gifteroids: Query<(&Transform, &OrientedBox, Entity), With<GifteroidSize>>,
+    query_gifteroids: Query<(&Transform, &OrientedBox, &GifteroidSize, Entity)>,
     query_snowballs: Query<&Transform, With<Snowball>>,
 ) {
     let Some(rec) = rerun::RecordingStream::global(rerun::RecordingType::Data) else {
@@ -301,7 +328,7 @@ fn send_collision_geom_to_rerun(
     };
     let time = crate::rerun_time();
 
-    for (i, (transform_gifteroid, obb, entity)) in query_gifteroids.iter().enumerate() {
+    for (transform_gifteroid, obb, size, entity) in &query_gifteroids {
         let position_gifteroid = transform_gifteroid.translation.truncate();
 
         // outer lines of gifteroid
@@ -320,6 +347,8 @@ fn send_collision_geom_to_rerun(
         rerun::MsgSender::new(format!("collision/gifteroids/{}", entity.index()))
             .with_timepoint(time.clone())
             .with_component(&[rerun::components::LineStrip2D(lines)])
+            .unwrap()
+            .with_component(&[*size])
             .unwrap()
             .send(&rec)
             .map_err(anyhow::Error::msg)
@@ -346,7 +375,7 @@ fn send_collision_geom_to_rerun(
         lines.push(tri_b.to_array().into());
         lines.push(tri_c.to_array().into());
         lines.push(tri_a.to_array().into());
-        rerun::MsgSender::new(format!("collision/gifteroids/grinch"))
+        rerun::MsgSender::new("collision/gifteroids/grinch")
             .with_timepoint(time.clone())
             .with_component(&[rerun::components::LineStrip2D(lines)])
             .unwrap()
