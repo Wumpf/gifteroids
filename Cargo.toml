@@ -21,6 +21,11 @@ parking_lot = "0.12"
 tinyjson = "2"
 
 bevy_prototype_debug_lines = { version = "0.9", optional = true }
+anyhow = "1.0"
+
+# This version has much improved session handling!
+rerun = {git ="https://github.com/rerun-io/rerun", branch = "cmc/py/recordingstream_exposed", optional = true, default-features = false, features = ["sdk"]}
+#rerun = { version = "0.5.1", optional = true }
 
 [profile.release]
 lto = "fat"
@@ -29,3 +34,16 @@ opt-level = 'z'
 
 [features]
 debug_lines = ["dep:bevy_prototype_debug_lines"]
+
+
+# rerun patches
+[patch.crates-io]
+ecolor = { git = "https://github.com/emilk/egui", rev = "e9fa6c8ff68a0257ce0f2801446ba701917b7ae9" }
+eframe = { git = "https://github.com/emilk/egui", rev = "e9fa6c8ff68a0257ce0f2801446ba701917b7ae9" }
+egui = { git = "https://github.com/emilk/egui", rev = "e9fa6c8ff68a0257ce0f2801446ba701917b7ae9" }
+egui-wgpu = { git = "https://github.com/emilk/egui", rev = "e9fa6c8ff68a0257ce0f2801446ba701917b7ae9" }
+egui_extras = { git = "https://github.com/emilk/egui", rev = "e9fa6c8ff68a0257ce0f2801446ba701917b7ae9" }
+emath = { git = "https://github.com/emilk/egui", rev = "e9fa6c8ff68a0257ce0f2801446ba701917b7ae9" }
+wgpu = { git = "https://github.com/rerun-io/wgpu", rev = "de497aeda152a3515bac5eb4bf1b17f1757b9dac" }
+wgpu-core = { git = "https://github.com/rerun-io/wgpu", rev = "de497aeda152a3515bac5eb4bf1b17f1757b9dac" }
+

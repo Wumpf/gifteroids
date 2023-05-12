@@ -39,8 +39,22 @@ fn setup(mut commands: Commands) {
     commands.insert_resource(Score(START_SCORE));
 }
 
+fn log_score(score: &Score) -> anyhow::Result<()> {
+    #[cfg(feature = "rerun")]
+    {
+        rerun::RecordingStream::global(rerun::RecordingType::Data).map_or(Ok(()), |rec| {
+            rerun::MsgSender::new("plots/score")
+                .with_timepoint(crate::rerun_time())
+                .with_component(&[rerun::components::Scalar(score.0 as _)])?
+                .send(&rec)
+                .map_err(anyhow::Error::msg)
+        })
+    }
+}
+
 fn reduce_score(mut score: ResMut<Score>) {
     score.0 = score.0.saturating_sub(SCORE_REDUCTION);
+    log_score(&score).unwrap()
 }
 
 fn on_asteroid_destroyed(

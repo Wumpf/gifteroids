@@ -22,7 +22,28 @@ pub enum GameState {
 #[derive(Component)]
 pub struct DespawnOnStateEnter(GameState);
 
+#[cfg(feature = "rerun")]
+pub fn rerun_time() -> rerun::time::TimePoint {
+    let timeline = rerun::time::Timeline::new("time", rerun::time::TimeType::Time);
+    [(timeline, rerun::time::Time::now().into())].into()
+}
+
 fn main() {
+    #[cfg(feature = "rerun")]
+    {
+        let rec = rerun::RecordingStreamBuilder::new("gifteroids")
+            .buffered()
+            .unwrap();
+        rec.connect(std::net::SocketAddr::new(
+            std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
+            9876,
+        ));
+    }
+
+    run_game();
+}
+
+fn run_game() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins)
         .add_state(GameState::Game)
