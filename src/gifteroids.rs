@@ -57,26 +57,11 @@ struct GifteroidBundle {
     despawner: DespawnOnStateEnter,
 }
 
-#[cfg(feature = "rerun")]
-use rerun::external::re_log_types::external::{arrow2, arrow2_convert};
-
 #[derive(Component, Clone, Copy)]
-#[cfg_attr(
-    feature = "rerun",
-    derive(arrow2_convert::ArrowField, arrow2_convert::ArrowSerialize,),
-    arrow_field(type = "dense")
-)]
 pub enum GifteroidSize {
     Large = 0,
     Medium = 1,
     Small = 2,
-}
-
-#[cfg(feature = "rerun")]
-impl rerun::Component for GifteroidSize {
-    fn name() -> rerun::ComponentName {
-        "ext.GifteroidSize".into()
-    }
 }
 
 fn on_load(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -202,8 +187,8 @@ fn gifteroid_snowball_collision(
                 transform_snowball.translation.truncate(),
                 position_gifteroid,
             ) {
+                log_gifteroid_despawn(entity_gifteroid);
                 commands.entity(entity_gifteroid).despawn();
-                log_gifteroid_despawn(entity_gifteroid.index());
                 commands.entity(entity_snowball).despawn();
 
                 destroyed_events.send(GifteroidDestroyedEvent {
@@ -293,20 +278,28 @@ fn check_win_condition(
     }
 }
 
-fn log_gifteroid_despawn(index: u32) {
+fn log_gifteroid_despawn(entity: Entity) {
     #[cfg(feature = "rerun")]
     {
         if let Some(rec) = rerun::RecordingStream::global(rerun::RecordingType::Data) {
             let time = crate::rerun_time();
             rec.record_path_op(
                 time.clone(),
-                rerun::log::PathOp::clear(true, format!("collision/gifteroids/{index}").into()),
+                rerun::log::PathOp::clear(
+                    true,
+                    format!(
+                        "collision/gifteroids/{}_{}",
+                        entity.index(),
+                        entity.generation()
+                    )
+                    .into(),
+                ),
             );
 
             rerun::MsgSender::new("log")
                 .with_timepoint(time.clone())
                 .with_component(&[rerun::components::TextEntry::new(
-                    format!("despawn {index}"),
+                    format!("despawn {:?}", entity),
                     Some("INFO".to_owned()),
                 )])
                 .unwrap()
@@ -328,6 +321,18 @@ fn send_collision_geom_to_rerun(
     };
     let time = crate::rerun_time();
 
+    use rerun::external::re_log_types::external::{arrow2, arrow2_convert};
+
+    #[derive(arrow2_convert::ArrowField, arrow2_convert::ArrowSerialize)]
+    #[arrow_field(transparent)]
+    struct GifteroidSizeInt(i32);
+
+    impl rerun::Component for GifteroidSizeInt {
+        fn name() -> rerun::ComponentName {
+            "ext.gifteroids_size".into()
+        }
+    }
+
     for (transform_gifteroid, obb, size, entity) in &query_gifteroids {
         let position_gifteroid = transform_gifteroid.translation.truncate();
 
@@ -344,15 +349,19 @@ fn send_collision_geom_to_rerun(
         lines.push(bottom_left.to_array().into());
         lines.push(bottom_right.to_array().into());
         lines.push(top_right.to_array().into());
-        rerun::MsgSender::new(format!("collision/gifteroids/{}", entity.index()))
-            .with_timepoint(time.clone())
-            .with_component(&[rerun::components::LineStrip2D(lines)])
-            .unwrap()
-            .with_component(&[*size])
-            .unwrap()
-            .send(&rec)
-            .map_err(anyhow::Error::msg)
-            .ok();
+        rerun::MsgSender::new(format!(
+            "collision/gifteroids/{}_{}",
+            entity.index(),
+            entity.generation()
+        ))
+        .with_timepoint(time.clone())
+        .with_component(&[rerun::components::LineStrip2D(lines)])
+        .unwrap()
+        .with_component(&[GifteroidSizeInt(*size as i32)])
+        .unwrap()
+        .send(&rec)
+        .map_err(anyhow::Error::msg)
+        .ok();
     }
 
     let points = query_snowballs
