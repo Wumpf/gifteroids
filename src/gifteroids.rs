@@ -21,6 +21,13 @@ impl Plugin for GifteroidsPlugin {
                     .with_system(screen_wrap_obb_entities)
                     .with_system(check_win_condition),
             );
+
+        #[cfg(feature = "rerun")]
+        {
+            app.add_system_set(
+                SystemSet::on_update(GameState::Game).with_system(send_collision_geom_to_rerun),
+            );
+        }
     }
 }
 
@@ -181,6 +188,7 @@ fn gifteroid_snowball_collision(
                 position_gifteroid,
             ) {
                 commands.entity(entity_gifteroid).despawn();
+                log_gifteroid_despawn(entity_gifteroid.index());
                 commands.entity(entity_snowball).despawn();
 
                 destroyed_events.send(GifteroidDestroyedEvent {
@@ -267,5 +275,83 @@ fn check_win_condition(
 ) {
     if query_gifteroids.is_empty() {
         state.set(GameState::Highscore).unwrap();
+    }
+}
+
+fn log_gifteroid_despawn(index: u32) {
+    #[cfg(feature = "rerun")]
+    {
+        if let Some(rec) = rerun::RecordingStream::global(rerun::RecordingType::Data) {
+            rec.record_path_op(
+                crate::rerun_time(),
+                rerun::log::PathOp::clear(true, format!("collision/gifteroid/{index}").into()),
+            );
+        }
+    }
+}
+
+#[cfg(feature = "rerun")]
+fn send_collision_geom_to_rerun(
+    query_spaceship: Query<&Transform, With<SpaceShip>>,
+    query_gifteroids: Query<(&Transform, &OrientedBox, Entity), With<GifteroidSize>>,
+    query_snowballs: Query<&Transform, With<Snowball>>,
+) {
+    let Some(rec) = rerun::RecordingStream::global(rerun::RecordingType::Data) else {
+        return;
+    };
+    let time = crate::rerun_time();
+
+    for (i, (transform_gifteroid, obb, entity)) in query_gifteroids.iter().enumerate() {
+        let position_gifteroid = transform_gifteroid.translation.truncate();
+
+        // outer lines of gifteroid
+        let top_right = position_gifteroid + obb.axis0 + obb.axis1;
+        let top_left = position_gifteroid - obb.axis0 + obb.axis1;
+        let bottom_left = position_gifteroid - obb.axis0 - obb.axis1;
+        let bottom_right = position_gifteroid + obb.axis0 - obb.axis1;
+
+        // TODO: Rerun doesn't yet have support for rotated rectangles.
+        let mut lines: Vec<rerun::components::Vec2D> = Vec::new();
+        lines.push(top_right.to_array().into());
+        lines.push(top_left.to_array().into());
+        lines.push(bottom_left.to_array().into());
+        lines.push(bottom_right.to_array().into());
+        lines.push(top_right.to_array().into());
+        rerun::MsgSender::new(format!("collision/gifteroids/{}", entity.index()))
+            .with_timepoint(time.clone())
+            .with_component(&[rerun::components::LineStrip2D(lines)])
+            .unwrap()
+            .send(&rec)
+            .map_err(anyhow::Error::msg)
+            .ok();
+    }
+
+    let points = query_snowballs
+        .iter()
+        .map(|transform| transform.translation.truncate().to_array().into())
+        .collect::<Vec<rerun::components::Point2D>>();
+    rerun::MsgSender::new(format!("collision/snowballs"))
+        .with_timepoint(time.clone())
+        .with_component(&points)
+        .unwrap()
+        .send(&rec)
+        .map_err(anyhow::Error::msg)
+        .ok();
+
+    if let Ok(spaceship_transform) = query_spaceship.get_single() {
+        let (tri_a, tri_b, tri_c) = SpaceShip::bounding_triangle(spaceship_transform);
+        // TODO: Rerun doesn't support triangles yet.
+        let mut lines: Vec<rerun::components::Vec2D> = Vec::new();
+        lines.push(tri_a.to_array().into());
+        lines.push(tri_b.to_array().into());
+        lines.push(tri_c.to_array().into());
+        lines.push(tri_a.to_array().into());
+        rerun::MsgSender::new(format!("collision/gifteroids/grinch"))
+            .with_timepoint(time.clone())
+            .with_component(&[rerun::components::LineStrip2D(lines)])
+            .unwrap()
+            .send(&rec)
+            .map_err(anyhow::Error::msg)
+            .ok();
     }
 }

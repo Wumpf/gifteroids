@@ -38,6 +38,7 @@ fn main() {
             std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
             9876,
         ));
+        rerun::RecordingStream::set_global(rerun::RecordingType::Data, Some(rec));
     }
 
     run_game();
