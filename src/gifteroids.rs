@@ -282,22 +282,8 @@ fn log_gifteroid_despawn(entity: Entity) {
     #[cfg(feature = "rerun")]
     {
         if let Some(rec) = rerun::RecordingStream::global(rerun::RecordingType::Data) {
-            let time = crate::rerun_time();
-            rec.record_path_op(
-                time.clone(),
-                rerun::log::PathOp::clear(
-                    true,
-                    format!(
-                        "collision/gifteroids/{}_{}",
-                        entity.index(),
-                        entity.generation()
-                    )
-                    .into(),
-                ),
-            );
-
             rerun::MsgSender::new("log")
-                .with_timepoint(time.clone())
+                .with_timepoint(crate::rerun_time())
                 .with_component(&[rerun::components::TextEntry::new(
                     format!("despawn {:?}", entity),
                     Some("INFO".to_owned()),
@@ -332,6 +318,11 @@ fn send_collision_geom_to_rerun(
             "ext.gifteroids_size".into()
         }
     }
+
+    rec.record_path_op(
+        time.clone(),
+        rerun::log::PathOp::clear(true, "collision/gifteroids".into()),
+    );
 
     for (transform_gifteroid, obb, size, entity) in &query_gifteroids {
         let position_gifteroid = transform_gifteroid.translation.truncate();
